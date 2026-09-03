@@ -1,0 +1,10 @@
+/vendor/
+/node_modules/
+/.idea/
+.DS_Store
+*.log
+.phpcs.cache
+.phpunit.result.cache
+phpcs.xml
+phpstan.neon
+
