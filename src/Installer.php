@@ -36,6 +36,13 @@ final class Installer {
 			);
 		}
 
+		/*
+		 * Reprise de la configuration du snippet dès l'activation : à ce moment
+		 * `plugins_loaded` est déjà passé, donc Plugin::boot() n'a pas tourné sur
+		 * cette requête et n'a encore rien capturé.
+		 */
+		\RSMW\Preparation\Config::capture_legacy_constants();
+
 		self::maybe_upgrade();
 
 		do_action( 'rsmw_activated' );
@@ -52,8 +59,12 @@ final class Installer {
 
 	/**
 	 * Exécute les migrations entre versions puis met à jour le marqueur.
+	 *
+	 * Volontairement publique et idempotente : WordPress n'exécute pas le hook
+	 * d'activation lors d'une mise à jour de plugin, elle doit donc pouvoir être
+	 * appelée depuis une requête ordinaire (cf. Plugin::boot).
 	 */
-	private static function maybe_upgrade(): void {
+	public static function maybe_upgrade(): void {
 		$installed = (string) get_option( self::VERSION_OPTION, '' );
 
 		if ( RSMW_VERSION === $installed ) {

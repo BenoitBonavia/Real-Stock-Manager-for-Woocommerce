@@ -1,0 +1,119 @@
+/**
+ * Métabox « Préparation » de la fiche commande.
+ */
+
+#mh-prep-box-inner .mh-head {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-bottom: 12px;
+}
+
+#mh-prep-box-inner .mh-bar {
+	flex: 1;
+	height: 8px;
+	border-radius: 99px;
+	background: #e6e6ec;
+	overflow: hidden;
+}
+
+#mh-prep-box-inner .mh-bar span {
+	display: block;
+	height: 100%;
+	background: #6d4aff;
+	transition: width .25s;
+}
+
+#mh-prep-box-inner .mh-count {
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+#mh-prep-box-inner table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+#mh-prep-box-inner th {
+	text-align: left;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: #646970;
+	padding: 6px 8px;
+	border-bottom: 1px solid #e6e6ec;
+}
+
+#mh-prep-box-inner td {
+	padding: 9px 8px;
+	border-bottom: 1px solid #f2f2f5;
+	vertical-align: middle;
+}
+
+#mh-prep-box-inner th.mh-c,
+#mh-prep-box-inner td.mh-c {
+	text-align: center;
+}
+
+#mh-prep-box-inner tr.is-done td {
+	background: #f6f3ff;
+}
+
+#mh-prep-box-inner .mh-variant {
+	color: #646970;
+	font-size: 12px;
+}
+
+#mh-prep-box-inner .mh-step {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+}
+
+#mh-prep-box-inner .mh-step button {
+	width: 26px;
+	height: 26px;
+	line-height: 1;
+	cursor: pointer;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	border-radius: 4px;
+	font-size: 15px;
+}
+
+#mh-prep-box-inner .mh-step button:disabled {
+	opacity: .35;
+	cursor: default;
+}
+
+#mh-prep-box-inner .mh-qty {
+	min-width: 44px;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+#mh-prep-box-inner .mh-free {
+	font-variant-numeric: tabular-nums;
+}
+
+#mh-prep-box-inner .mh-free.neg {
+	color: #b32d2e;
+	font-weight: 600;
+}
+
+#mh-prep-box-inner .mh-zero {
+	color: #c3c4c7;
+}
+
+#mh-prep-box-inner.busy {
+	opacity: .5;
+	pointer-events: none;
+}
+
+#mh-prep-box-inner .mh-msg {
+	margin-top: 10px;
+	font-size: 12px;
+	color: #646970;
+	min-height: 16px;
+}

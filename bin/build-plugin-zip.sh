@@ -137,6 +137,9 @@ if command -v unzip >/dev/null 2>&1; then
 		"$SLUG/$SLUG.php" \
 		"$SLUG/readme.txt" \
 		"$SLUG/src/Updater.php" \
+		"$SLUG/src/Modules/OrderPreparation.php" \
+		"$SLUG/templates/preparation/needs-page.php" \
+		"$SLUG/assets/js/preparation-metabox.js" \
 		"$SLUG/lib/plugin-update-checker/plugin-update-checker.php" \
 		"$SLUG/lib/plugin-update-checker/vendor/PucReadmeParser.php"
 	do

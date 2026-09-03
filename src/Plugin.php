@@ -9,6 +9,9 @@ namespace RSMW;
 
 use RSMW\Admin\Admin;
 use RSMW\Modules\ModuleInterface;
+use RSMW\Preparation\Config;
+use RSMW\Preparation\OrderStatus;
+use RSMW\Preparation\SnippetGuard;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -68,10 +71,45 @@ final class Plugin {
 		 */
 		Updater::register();
 
+		/*
+		 * Reprise de la configuration du snippet remplacé.
+		 *
+		 * Placée avant le contrôle des prérequis et appelée à chaque amorçage,
+		 * jamais depuis `rsmw_upgrade` : cette action n'est émise qu'une fois, et
+		 * pas nécessairement sur une requête où les constantes du snippet sont
+		 * chargées. L'adosser au marqueur de version ferait échouer la reprise
+		 * définitivement et sans signal. Sans constante, l'appel sort avant toute
+		 * lecture d'option.
+		 */
+		Config::capture_legacy_constants();
+
 		if ( ! Requirements::are_met() ) {
 			add_action( 'admin_notices', array( Requirements::class, 'render_notice' ) );
 
 			return;
+		}
+
+		/*
+		 * WordPress n'exécute pas le hook d'activation lors d'une mise à jour :
+		 * les migrations doivent donc aussi être déclenchées depuis une requête
+		 * ordinaire. Le coût est d'une lecture d'option.
+		 */
+		Installer::maybe_upgrade();
+
+		if ( SnippetGuard::snippet_is_active() ) {
+			/*
+			 * Le snippet remplacé est encore chargé. Tout enregistrer une seconde
+			 * fois provoquerait des doublons : statut, métabox, entrées de menu et
+			 * attribution automatique. Le plugin se met donc en veille.
+			 */
+			add_action( 'admin_notices', array( SnippetGuard::class, 'render_notice' ) );
+		} else {
+			/*
+			 * Enregistré hors module : si le module était désactivé alors que des
+			 * commandes portent encore ce statut, elles disparaîtraient des écrans
+			 * d'administration.
+			 */
+			OrderStatus::register();
 		}
 
 		if ( is_admin() ) {
@@ -105,7 +143,7 @@ final class Plugin {
 		return (array) apply_filters(
 			'rsmw_module_classes',
 			array(
-				// Exemple : \RSMW\Modules\BackorderSync::class,
+				\RSMW\Modules\OrderPreparation::class,
 			)
 		);
 	}

@@ -1,0 +1,335 @@
+/**
+ * Pages « Besoins & stock » et « Gestion stock ».
+ */
+
+.mh-wrap {
+	max-width: 1220px;
+}
+
+/* Indicateurs ----------------------------------------------------------- */
+
+.mh-kpis {
+	display: flex;
+	gap: 14px;
+	flex-wrap: wrap;
+	margin: 18px 0 22px;
+}
+
+.mh-kpi {
+	flex: 1;
+	min-width: 150px;
+	background: #fff;
+	border: 1px solid #e6e6ec;
+	border-radius: 10px;
+	padding: 14px 16px;
+}
+
+.mh-kpi .k {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	color: #646970;
+	margin-bottom: 6px;
+}
+
+.mh-kpi .v {
+	font-size: 24px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.1;
+}
+
+.mh-kpi.alert .v {
+	color: #b32d2e;
+}
+
+.mh-kpi.ok .v {
+	color: #00a32a;
+}
+
+/* Outils ---------------------------------------------------------------- */
+
+.mh-tools {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	flex-wrap: wrap;
+	margin-bottom: 14px;
+}
+
+.mh-tools input[type=search] {
+	min-width: 280px;
+}
+
+/* Tableau --------------------------------------------------------------- */
+
+.mh-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: #fff;
+	border: 1px solid #e6e6ec;
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.mh-table th {
+	text-align: left;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: #646970;
+	padding: 10px 12px;
+	border-bottom: 1px solid #e6e6ec;
+	background: #fafafc;
+	cursor: pointer;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.mh-table th.no-sort {
+	cursor: default;
+}
+
+.mh-table th[data-dir]:after {
+	content: '';
+	margin-left: 5px;
+}
+
+.mh-table th[data-dir=asc]:after {
+	content: '▲';
+	font-size: 8px;
+}
+
+.mh-table th[data-dir=desc]:after {
+	content: '▼';
+	font-size: 8px;
+}
+
+.mh-table td {
+	padding: 11px 12px;
+	border-bottom: 1px solid #f2f2f5;
+	vertical-align: middle;
+}
+
+.mh-table tbody tr:hover {
+	background: #fafafc;
+}
+
+.mh-table th.mh-num,
+.mh-table td.mh-num {
+	text-align: center;
+}
+
+.mh-num {
+	font-variant-numeric: tabular-nums;
+}
+
+/* États ----------------------------------------------------------------- */
+
+.mh-zero {
+	color: #c3c4c7;
+}
+
+.mh-neg,
+.mh-lack {
+	color: #b32d2e;
+	font-weight: 600;
+}
+
+.mh-full {
+	color: #00a32a;
+	font-weight: 600;
+}
+
+.mh-variant {
+	color: #646970;
+	font-size: 12px;
+}
+
+.mh-sku {
+	color: #8c8f94;
+	font-size: 11px;
+	font-family: ui-monospace, Menlo, monospace;
+}
+
+.mh-empty {
+	padding: 40px;
+	text-align: center;
+	color: #646970;
+}
+
+.mh-note {
+	margin-top: 18px;
+	font-size: 12px;
+	color: #646970;
+}
+
+.mh-slug {
+	font-family: ui-monospace, Menlo, monospace;
+	background: #f2f2f5;
+	padding: 1px 5px;
+	border-radius: 3px;
+}
+
+.mh-slug.is-active {
+	background: #e8dcff;
+	color: #4b2e83;
+	font-weight: 600;
+}
+
+/* Encarts --------------------------------------------------------------- */
+
+.mh-realloc {
+	background: #fff;
+	border: 1px solid #e6e6ec;
+	border-left: 4px solid #6d4aff;
+	border-radius: 10px;
+	padding: 16px 20px;
+	margin: 18px 0;
+}
+
+.mh-realloc.dry {
+	border-left-color: #dba617;
+	background: #fffdf5;
+}
+
+.mh-realloc h2 {
+	margin: 0 0 8px;
+	font-size: 15px;
+}
+
+.mh-realloc ul {
+	margin: 10px 0 0 18px;
+}
+
+.mh-realloc form {
+	margin-top: 12px;
+	display: flex;
+	gap: 8px;
+}
+
+.mh-fresh {
+	background: #fff;
+	border: 1px solid #e6e6ec;
+	border-radius: 10px;
+	padding: 10px 14px;
+	margin-bottom: 14px;
+	font-size: 12px;
+	color: #50575e;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.mh-fresh .mh-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #00a32a;
+	flex: none;
+}
+
+.mh-fresh .button {
+	margin-left: auto;
+}
+
+.mh-outside {
+	flex-basis: 100%;
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid #f2f2f5;
+	color: #8a6d1f;
+}
+
+/* Page « Gestion stock » ------------------------------------------------ */
+
+.mh-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+	gap: 18px;
+	margin: 18px 0 26px;
+	align-items: start;
+}
+
+.mh-form {
+	background: #fff;
+	border: 1px solid #e6e6ec;
+	border-radius: 10px;
+	padding: 20px;
+	margin: 0;
+}
+
+.mh-form.in {
+	border-left: 4px solid #00a32a;
+}
+
+.mh-form.out {
+	border-left: 4px solid #b32d2e;
+}
+
+.mh-form h2 {
+	margin: 0 0 4px;
+	font-size: 15px;
+}
+
+.mh-form .lede {
+	color: #646970;
+	font-size: 12px;
+	margin: 0 0 16px;
+}
+
+.mh-form label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
+.mh-form .row {
+	margin-bottom: 16px;
+}
+
+.mh-form .hint {
+	font-weight: 400;
+	color: #646970;
+	font-size: 12px;
+	margin-top: 5px;
+}
+
+.mh-report {
+	background: #fff;
+	border: 1px solid #e6e6ec;
+	border-left: 4px solid #6d4aff;
+	border-radius: 10px;
+	padding: 18px 20px;
+	margin-bottom: 18px;
+}
+
+.mh-report.out {
+	border-left-color: #b32d2e;
+}
+
+.mh-report h2 {
+	margin-top: 0;
+	font-size: 15px;
+}
+
+.mh-report ul {
+	margin: 10px 0 0 18px;
+}
+
+.mh-report .big {
+	font-size: 20px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.mh-move-in {
+	color: #00a32a;
+	font-weight: 600;
+}
+
+.mh-move-out {
+	color: #b32d2e;
+	font-weight: 600;
+}

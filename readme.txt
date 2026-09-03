@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,12 +44,24 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
 
+= 0.2.0 =
+* Module « Préparation des commandes & stock physique » : reprise intégrale du snippet, sans migration de données.
+* Statut de commande « À empaqueter », métabox de pointage, colonne d'avancement sur la liste des commandes.
+* Pages « Besoins & stock » et « Gestion stock » (entrées, retraits, réaffectation FIFO, journal des mouvements).
+* Champs de stock physique sur les produits simples et sur chaque variation.
+* Mise en veille automatique tant que le snippet WPCode équivalent est actif, pour permettre une bascule sans coupure.
+* Reprise automatique de la configuration depuis les constantes MH_PREP_*.
+* Panneau de diagnostic dans les réglages : volumétrie des données reprises et état du statut.
+
 = 0.1.0 =
 * Version initiale : structure du plugin, registre de modules, onglet de réglages WooCommerce.
 * Déclaration de compatibilité HPOS et blocs Panier/Commande.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.2.0 =
+Mettez à jour l’extension AVANT de désactiver le snippet : la configuration est reprise depuis ses constantes tant qu’il est encore actif. Le module reste en veille jusqu’à sa désactivation.
 
 = 0.1.0 =
 Première version.

@@ -115,6 +115,50 @@ L'autoloader maison (`src/Autoloader.php`) suffit en production : le plugin fonc
 
 Ces déclarations sont faites sur `before_woocommerce_init` dans le fichier principal ; à réévaluer si un module venait à manipuler directement les tables de commandes historiques.
 
+## Module « Préparation des commandes & stock physique »
+
+Remplace le snippet WPCode « Maison Hespérides — Préparation ». Gère un stock physique réel,
+distinct du stock WooCommerce : statut de commande « À empaqueter », métabox de pointage,
+pages *Besoins & stock* et *Gestion stock*, attribution FIFO, champs de stock sur les produits.
+
+### Continuité des données
+
+Le module lit et écrit **exactement les mêmes clés** que le snippet — aucune migration.
+Elles sont figées dans `src/Preparation/Legacy.php` et ne doivent jamais changer :
+
+`_mh_stock_reel` · `_mh_prep_qty` · `_mh_prep_from_stock` · `_mh_prep_date` · `_mh_prep_user` ·
+`_mh_prep_prev_status` · statut `wc-mh-empaqueter` · option `mh_prep_receptions` ·
+pages `mh-prep-stock` et `mh-prep-reception`.
+
+### Bascule sans coupure
+
+Tant que le snippet est chargé, `SnippetGuard` met le module **et** l'enregistrement du statut en
+veille, et affiche un avertissement. Sans cela les deux accrocheraient les mêmes hooks : double
+attribution automatique, double métabox, entrées de menu en double.
+
+Cette garde repose sur un point de calendrier : WPCode exécute les snippets « Exécuter partout »
+sur `plugins_loaded` **priorité 5**, le plugin s'amorce sur ce même hook en **priorité 20**.
+Abaisser cette priorité sous 5 casserait la détection sans aucun signal.
+
+**Procédure :**
+
+1. Sauvegarder la base de données.
+2. Mettre à jour le plugin **en laissant le snippet actif** — la configuration est reprise depuis
+   les constantes `MH_PREP_*` tant qu'elles existent.
+3. Vérifier les statuts suivis dans *WooCommerce → Réglages → Stocks réels → Préparation*.
+4. Désactiver le snippet WPCode.
+5. Contrôler le panneau **Diagnostic** du même onglet : il affiche la volumétrie des données
+   reprises (références avec stock, lignes pointées, mouvements) et l'état du statut.
+
+**Retour arrière** : réactiver le snippet. Le module se remet en veille au chargement suivant,
+les données n'ayant bougé dans aucun sens.
+
+### Réglages
+
+`Config` résout chaque réglage dans cet ordre : **constante `MH_PREP_*` → option `rsmw_*` → défaut**.
+Une constante encore définie est signalée dans l'écran de réglages, et le champ correspondant reste
+volontairement modifiable — le désactiver ferait enregistrer une valeur vide par WooCommerce.
+
 ## Mises à jour depuis GitHub
 
 Le plugin embarque [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) 5.7

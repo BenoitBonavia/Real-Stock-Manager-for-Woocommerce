@@ -17,9 +17,16 @@ if ( defined( 'RSMW_KEEP_DATA_ON_UNINSTALL' ) && RSMW_KEEP_DATA_ON_UNINSTALL ) {
 
 /**
  * Supprime toutes les options préfixées rsmw_ du site courant.
+ *
+ * Les données métier (stock physique, pointages, journal) ne sont effacées que
+ * si l'utilisateur l'a explicitement demandé dans les réglages : elles sont
+ * partagées avec le snippet que ce plugin remplace, et les supprimer par défaut
+ * rendrait tout retour arrière impossible.
  */
 function rsmw_uninstall_delete_options(): void {
 	global $wpdb;
+
+	$delete_data = 'yes' === get_option( 'rsmw_delete_data_on_uninstall', 'no' );
 
 	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- désinstallation ponctuelle, pas de cache pertinent.
 	$option_names = $wpdb->get_col(
@@ -43,6 +50,26 @@ function rsmw_uninstall_delete_options(): void {
 	delete_option( 'external_updates-' . $puc_slug );
 	delete_site_option( 'external_updates-' . $puc_slug );
 	wp_clear_scheduled_hook( 'puc_cron_check_updates-' . $puc_slug );
+
+	// Caches de la table des besoins : sans valeur, toujours reconstructibles.
+	delete_transient( 'mh_prep_demand_v1' );
+	delete_transient( 'mh_prep_demand_v1_meta' );
+	delete_transient( 'rsmw_prep_allocatable' );
+
+	if ( ! $delete_data ) {
+		return;
+	}
+
+	// Données métier, sur demande explicite uniquement.
+	delete_option( 'mh_prep_receptions' );
+
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- désinstallation ponctuelle.
+	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_mh_stock_reel' ) );
+
+	foreach ( array( '_mh_prep_qty', '_mh_prep_from_stock', '_mh_prep_date', '_mh_prep_user' ) as $item_meta_key ) {
+		$wpdb->delete( $wpdb->prefix . 'woocommerce_order_itemmeta', array( 'meta_key' => $item_meta_key ) );
+	}
+	// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 }
 
 if ( is_multisite() ) {

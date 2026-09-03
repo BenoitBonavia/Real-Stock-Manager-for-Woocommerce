@@ -1,0 +1,50 @@
+/**
+ * Statut « À empaqueter » et colonne « Préparation » de la liste des commandes.
+ *
+ * Les sélecteurs de la pastille reprennent le slug figé du statut
+ * (cf. RSMW\Preparation\Legacy::STATUS_SLUG).
+ */
+
+.order-status.status-mh-empaqueter,
+mark.mh-empaqueter {
+	background: #e8dcff;
+	color: #4b2e83;
+}
+
+.rsmw-prep-progress {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+}
+
+.rsmw-prep-progress__track {
+	width: 52px;
+	height: 6px;
+	border-radius: 99px;
+	background: #e6e6ec;
+	overflow: hidden;
+	display: inline-block;
+}
+
+.rsmw-prep-progress__fill {
+	display: block;
+	height: 100%;
+	background: #dcdcde;
+}
+
+.rsmw-prep-progress--partial .rsmw-prep-progress__fill {
+	background: #6d4aff;
+}
+
+.rsmw-prep-progress--complete .rsmw-prep-progress__fill {
+	background: #00a32a;
+}
+
+.rsmw-prep-progress__label {
+	font-variant-numeric: tabular-nums;
+	color: #50575e;
+}
+
+.rsmw-prep-progress__none {
+	color: #c3c4c7;
+}
