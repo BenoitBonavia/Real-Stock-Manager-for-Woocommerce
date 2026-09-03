@@ -12,7 +12,12 @@ Plugin maison regroupant les règles et automatismes de gestion des **stocks ré
 ```
 real-stock-manager-for-woocommerce/
 ├── real-stock-manager-for-woocommerce.php  Fichier principal : en-tête, constantes, hooks d'amorçage
+├── readme.txt                              Métadonnées au format WordPress.org (lues pour la fiche de mise à jour)
 ├── uninstall.php                           Purge des options rsmw_* à la suppression
+├── .gitattributes                          export-ignore : fichiers exclus des archives
+├── .github/workflows/release.yml           Construit et publie l'archive sur push d'un tag v*
+├── bin/build-plugin-zip.sh                 Construction reproductible de l'archive d'installation
+├── lib/plugin-update-checker/              Bibliothèque tierce embarquée (Plugin Update Checker 5.7)
 ├── composer.json                           Autoload PSR-4 + outillage de dev (PHPCS, PHPStan)
 ├── phpcs.xml.dist                          Règles WordPress Coding Standards
 ├── phpstan.neon.dist                       Analyse statique avec stubs WordPress/WooCommerce
@@ -24,6 +29,7 @@ real-stock-manager-for-woocommerce/
     ├── Autoloader.php                      Autoload PSR-4 sans Composer
     ├── functions.php                       Helpers globaux : rsmw(), rsmw_log()
     ├── Plugin.php                          Conteneur : amorçage + registre des modules
+    ├── Updater.php                         Mises à jour depuis les releases GitHub
     ├── Requirements.php                    Vérification WooCommerce
     ├── Installer.php                       Activation / désactivation / migrations
     ├── Admin/
@@ -109,11 +115,68 @@ L'autoloader maison (`src/Autoloader.php`) suffit en production : le plugin fonc
 
 Ces déclarations sont faites sur `before_woocommerce_init` dans le fichier principal ; à réévaluer si un module venait à manipuler directement les tables de commandes historiques.
 
+## Mises à jour depuis GitHub
+
+Le plugin embarque [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) 5.7
+(`lib/plugin-update-checker/`, copie amont non modifiée). Les mises à jour apparaissent dans
+l'écran Extensions de WordPress comme pour n'importe quelle extension.
+
+Configuration dans `src/Updater.php` :
+
+| Réglage | Valeur | Pourquoi |
+|---------|--------|----------|
+| Dépôt | `BenoitBonavia/Real-Stock-Manager-for-Woocommerce` | Public : aucun jeton requis. |
+| `setBranch( 'main' )` | obligatoire | La bibliothèque suppose `master`. Les stratégies « dernière release » puis « tag le plus élevé » ne sont activées que si la branche vaut exactement `master` ou `main`. |
+| `enableReleaseAssets( '/\.zip($\|[?&#])/i' )` | avec expression régulière | Sans filtre, le **premier** fichier attaché à la release est retenu, quel qu'il soit. |
+| Slug | `dirname( RSMW_BASENAME )` | Doit correspondre au nom du dossier d'installation, sinon la mise à jour s'installe à côté. |
+| `RSMW_GITHUB_TOKEN` | facultative | À définir dans `wp-config.php` pour relever la limite de l'API GitHub (60 req/h par IP sans jeton). Deviendrait obligatoire si le dépôt passait en privé. |
+
+Le vérificateur est branché **avant** le contrôle des prérequis WooCommerce : si WooCommerce
+venait à manquer, le site doit rester capable de recevoir un correctif.
+
+### Règle absolue : le tag ne fait pas la version
+
+La bibliothèque lit l'en-tête `Version:` du fichier principal **tel qu'il est dans le tag distant**.
+Le tag indique seulement *où* lire. Taguer `v0.2.0` en laissant `Version: 0.1.0` ne déclenche
+**aucune** mise à jour, et sans message d'erreur.
+
+Trois valeurs doivent rester alignées, plus le tag git :
+
+1. l'en-tête `Version:` du fichier principal ;
+2. la constante `RSMW_VERSION` ;
+3. le `Stable tag:` de `readme.txt`.
+
+`bin/build-plugin-zip.sh` échoue si elles divergent, et le workflow de release compare
+en plus le tag git (`--expect`).
+
+## Publier une version
+
+```bash
+# 1. Bumper les trois numéros de version (fichier principal ×2, readme.txt)
+# 2. Committer, puis :
+git tag v0.2.0
+git push origin main --tags
+```
+
+Le workflow `.github/workflows/release.yml` construit alors l'archive et la publie
+en pièce jointe de la release. Les sites vérifient au plus toutes les 12 heures ;
+le lien « Check for updates » de l'écran Extensions force une vérification.
+
+Construire l'archive localement :
+
+```bash
+bin/build-plugin-zip.sh              # produit dist/real-stock-manager-for-woocommerce-<version>.zip
+bin/build-plugin-zip.sh --ref v0.2.0 # à partir d'un tag précis
+```
+
+Le script archive une **référence git**, pas le répertoire de travail : les modifications
+non commitées sont ignorées, volontairement, pour que l'archive soit reproductible.
+
 ## Choix conformes aux standards actuels
 
 | Point | Choix | Raison |
 |-------|-------|--------|
-| `Update URI: false` | présent | Empêche WordPress.org d'écraser ce plugin par une extension homonyme du dépôt officiel. |
+| `Update URI: false` | présent, **conservé** | Empêche WordPress.org d'écraser ce plugin par une extension homonyme. Aucun conflit avec le vérificateur de mises à jour : celui-ci injecte via le filtre de lecture `site_transient_update_plugins`, jamais via `update_plugins_{$hostname}`. Mettre l'URL GitHub à la place serait pire : le cœur en extrait le hostname `github.com` et n'importe quelle autre extension accrochée à `update_plugins_github.com` pourrait injecter une mise à jour arbitraire. |
 | `load_plugin_textdomain()` | **absent** | Depuis WordPress 6.8, le chargement « just-in-time » couvre toutes les extensions via les en-têtes `Text Domain` / `Domain Path`. Appeler la fonction n'apporte rien et expose au `_doing_it_wrong` « translation loading triggered too early ». |
 | `declare( strict_types=1 )` | **absent** | WooCommerce ne l'utilise pas, y compris dans son code moderne sous `src/`. En mode strict, une valeur transmise par un filtre WordPress (souvent `string` là où l'on attend `int`) lève une `TypeError` au lieu d'être convertie. Les types de paramètres et de retour sont conservés, en mode coercitif. |
 | `wp_enqueue_script()` | `$args` en tableau | Signature WordPress 6.3+ (`in_footer`, `strategy`) plutôt que le booléen historique. |

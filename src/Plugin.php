@@ -60,6 +60,14 @@ final class Plugin {
 		 * que les en-têtes Text Domain et Domain Path sont présents et que le
 		 * text domain correspond au slug du dossier du plugin.
 		 */
+
+		/*
+		 * Les mises à jour sont branchées AVANT le contrôle des prérequis : si
+		 * WooCommerce venait à manquer, le site doit rester capable de recevoir
+		 * un correctif du plugin.
+		 */
+		Updater::register();
+
 		if ( ! Requirements::are_met() ) {
 			add_action( 'admin_notices', array( Requirements::class, 'render_notice' ) );
 

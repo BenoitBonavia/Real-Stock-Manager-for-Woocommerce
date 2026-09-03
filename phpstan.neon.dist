@@ -7,8 +7,14 @@ parameters:
         - real-stock-manager-for-woocommerce.php
         - uninstall.php
         - src
+    excludePaths:
+        # Bibliothèque tierce embarquée telle quelle.
+        - lib/*
     bootstrapFiles:
         - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
     scanFiles:
         - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+        # Permet à PHPStan de résoudre la fabrique du vérificateur de mises à jour.
+        - lib/plugin-update-checker/Puc/v5/PucFactory.php
+        - lib/plugin-update-checker/Puc/v5p7/PucFactory.php
     treatPhpDocTypesAsCertain: false

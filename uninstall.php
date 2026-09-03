@@ -32,6 +32,17 @@ function rsmw_uninstall_delete_options(): void {
 	}
 
 	wp_clear_scheduled_hook( 'rsmw_daily_maintenance' );
+
+	/*
+	 * Résidus de la bibliothèque de mise à jour. Elle nettoie normalement elle-même
+	 * sur l'action `uninstall_{plugin}`, mais la présence de ce fichier uninstall.php
+	 * court-circuite cette action : le ménage doit donc être fait ici.
+	 */
+	$puc_slug = 'real-stock-manager-for-woocommerce';
+
+	delete_option( 'external_updates-' . $puc_slug );
+	delete_site_option( 'external_updates-' . $puc_slug );
+	wp_clear_scheduled_hook( 'puc_cron_check_updates-' . $puc_slug );
 }
 
 if ( is_multisite() ) {
