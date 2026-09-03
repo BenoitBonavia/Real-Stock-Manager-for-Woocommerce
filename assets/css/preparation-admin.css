@@ -101,12 +101,18 @@
 
 /* Console de mouvement --------------------------------------------------- */
 
+/*
+ * La console annule la marge basse de ses propres cartes (voir plus bas) pour
+ * que les deux colonnes s'alignent : c'est donc elle qui porte l'espacement
+ * avec le bloc suivant, sans quoi le journal viendrait coller au formulaire.
+ */
 .rsmw-console {
 	display: grid;
 	grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr);
 	gap: 20px;
 	align-items: start;
 	margin-top: 20px;
+	margin-bottom: 20px;
 }
 
 @media (max-width: 960px) {
