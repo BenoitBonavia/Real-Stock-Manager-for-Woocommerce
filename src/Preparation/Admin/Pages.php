@@ -89,10 +89,23 @@ final class Pages {
 			return;
 		}
 
+		/*
+		 * `wp-theme` expose les jetons du WordPress Design System (--wpds-*).
+		 * Enregistrée depuis WordPress 7.1 mais chargée seulement sur certains
+		 * écrans : on la déclare en dépendance pour garantir que le bloc :root
+		 * soit analysé avant notre feuille. Absente, la feuille reste valide
+		 * grâce aux valeurs de repli.
+		 */
+		$style_deps = array( 'woocommerce_admin_styles' );
+
+		if ( wp_style_is( 'wp-theme', 'registered' ) ) {
+			array_unshift( $style_deps, 'wp-theme' );
+		}
+
 		wp_enqueue_style(
 			'rsmw-preparation-admin',
 			RSMW_URL . 'assets/css/preparation-admin.css',
-			array(),
+			$style_deps,
 			RSMW_VERSION
 		);
 
@@ -108,7 +121,14 @@ final class Pages {
 
 		if ( $screens['stock'] === $hook_suffix ) {
 			wp_enqueue_script( 'wc-enhanced-select' );
-			wp_enqueue_style( 'woocommerce_admin_styles' );
+
+			wp_enqueue_script(
+				'rsmw-stock-movement',
+				RSMW_URL . 'assets/js/stock-movement.js',
+				array( 'jquery', 'wc-enhanced-select' ),
+				RSMW_VERSION,
+				array( 'in_footer' => true )
+			);
 		}
 	}
 

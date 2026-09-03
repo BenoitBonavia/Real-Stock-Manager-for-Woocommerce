@@ -1,6 +1,6 @@
 <?php
 /**
- * Page « Gestion stock » : entrées et retraits.
+ * Page « Gestion stock » : console de mouvement.
  *
  * @package RealStockManager
  */
@@ -17,11 +17,17 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Saisie des mouvements de stock physique.
  *
- * Une entrée est affectée automatiquement aux commandes les plus anciennes qui
- * l'attendent ; une sortie puise d'abord dans le stock libre, puis reprend aux
- * commandes les plus récentes.
+ * Un seul formulaire porte les deux sens : une entrée est affectée aux commandes
+ * les plus anciennes qui l'attendent, une sortie puise d'abord dans le stock
+ * libre puis reprend aux commandes les plus récentes.
  */
 final class StockPage {
+
+	/** Nonce du formulaire de mouvement. */
+	private const NONCE = 'rsmw_stock_movement';
+
+	/** Sens autorisés. */
+	private const DIRECTIONS = array( 'in', 'out' );
 
 	/**
 	 * Affiche la page.
@@ -31,20 +37,18 @@ final class StockPage {
 			wp_die( esc_html__( 'Droits insuffisants.', 'real-stock-manager-for-woocommerce' ) );
 		}
 
-		$errors = array();
-
-		$incoming = self::handle_receive( $errors );
-		$outgoing = self::handle_withdraw( $errors );
+		$errors   = array();
+		$movement = self::handle_movement( $errors );
 
 		View::render(
 			'stock-page',
 			array(
-				'incoming'      => $incoming,
-				'outgoing'      => $outgoing,
-				'errors'        => $errors,
-				'journal'       => Journal::all(),
-				'reasons'       => self::reasons(),
-				'search_nonce'  => wp_create_nonce( 'search-products' ),
+				'movement'       => $movement,
+				'errors'         => $errors,
+				'journal'        => Journal::all(),
+				'reasons'        => self::reasons(),
+				'nonce_field'    => wp_nonce_field( self::NONCE, '_wpnonce', true, false ),
+				'search_nonce'   => wp_create_nonce( 'search-products' ),
 				'needs_page_url' => admin_url( 'admin.php?page=' . Legacy::PAGE_NEEDS ),
 			)
 		);
@@ -66,86 +70,76 @@ final class StockPage {
 	}
 
 	/**
-	 * Traite le formulaire d'entrée en stock.
+	 * Traite le formulaire de mouvement.
 	 *
 	 * @param array $errors Messages d'erreur, complétés par référence.
 	 *
-	 * @return array|null Compte rendu, ou null si aucune demande.
+	 * @return array|null Sens et compte rendu, ou null si aucune demande.
 	 */
-	private static function handle_receive( array &$errors ): ?array {
-		if ( ! isset( $_POST['mh_prep_receive'] ) ) {
+	private static function handle_movement( array &$errors ): ?array {
+		if ( ! isset( $_POST['rsmw_stock_submit'] ) ) {
 			return null;
 		}
 
-		check_admin_referer( 'mh_prep_receive' );
+		check_admin_referer( self::NONCE );
 
-		$product_id = self::resolve_product( 'mh_prep_product', 'mh_prep_sku' );
-		$quantity   = isset( $_POST['mh_prep_qty'] ) ? absint( wp_unslash( $_POST['mh_prep_qty'] ) ) : 0;
+		$direction = isset( $_POST['rsmw_movement_direction'] )
+			? sanitize_key( wp_unslash( $_POST['rsmw_movement_direction'] ) )
+			: '';
 
-		if ( $product_id <= 0 || $quantity <= 0 ) {
-			$errors[] = __( 'Produit introuvable ou quantité vide. Rien n’a été enregistré.', 'real-stock-manager-for-woocommerce' );
+		if ( ! in_array( $direction, self::DIRECTIONS, true ) ) {
+			$errors[] = __( 'Sens du mouvement invalide. Rien n’a été enregistré.', 'real-stock-manager-for-woocommerce' );
 
 			return null;
 		}
 
-		$report = Allocator::receive( $product_id, $quantity );
+		$product_id = self::resolve_product( 'rsmw_movement_product', 'rsmw_movement_sku' );
+		$quantity   = isset( $_POST['rsmw_movement_qty'] ) ? absint( wp_unslash( $_POST['rsmw_movement_qty'] ) ) : 0;
+
+		if ( $product_id <= 0 ) {
+			$errors[] = __( 'Référence introuvable. Choisissez-la dans la liste ou saisissez un SKU exact.', 'real-stock-manager-for-woocommerce' );
+		}
+
+		if ( $quantity <= 0 ) {
+			$errors[] = __( 'La quantité doit être supérieure à zéro.', 'real-stock-manager-for-woocommerce' );
+		}
+
+		if ( ! empty( $errors ) ) {
+			return null;
+		}
+
+		$reason = 'out' === $direction && isset( $_POST['rsmw_movement_reason'] )
+			? sanitize_text_field( wp_unslash( $_POST['rsmw_movement_reason'] ) )
+			: '';
+
+		if ( 'in' === $direction ) {
+			$report   = Allocator::receive( $product_id, $quantity );
+			$moved    = $quantity;
+			$affected = (int) $report['affecte'];
+		} else {
+			$report   = Allocator::withdraw( $product_id, $quantity, $reason );
+			$moved    = (int) $report['du_libre'] + (int) $report['repris'];
+			$affected = (int) $report['repris'];
+		}
 
 		Journal::add(
 			array(
 				'time'   => time(),
 				'user'   => wp_get_current_user()->display_name,
-				'type'   => 'in',
+				'type'   => 'in' === $direction ? 'in' : 'out',
 				'label'  => self::reference_label( $product_id ),
-				'qty'    => $quantity,
-				'orders' => $report['affecte'],
-				'libre'  => $report['libre'],
-				'motif'  => '',
-			)
-		);
-
-		return $report;
-	}
-
-	/**
-	 * Traite le formulaire de retrait de stock.
-	 *
-	 * @param array $errors Messages d'erreur, complétés par référence.
-	 *
-	 * @return array|null Compte rendu, ou null si aucune demande.
-	 */
-	private static function handle_withdraw( array &$errors ): ?array {
-		if ( ! isset( $_POST['mh_prep_withdraw'] ) ) {
-			return null;
-		}
-
-		check_admin_referer( 'mh_prep_withdraw' );
-
-		$product_id = self::resolve_product( 'mh_prep_out_product', 'mh_prep_out_sku' );
-		$quantity   = isset( $_POST['mh_prep_out_qty'] ) ? absint( wp_unslash( $_POST['mh_prep_out_qty'] ) ) : 0;
-		$reason     = isset( $_POST['mh_prep_out_motif'] ) ? sanitize_text_field( wp_unslash( $_POST['mh_prep_out_motif'] ) ) : '';
-
-		if ( $product_id <= 0 || $quantity <= 0 ) {
-			$errors[] = __( 'Produit introuvable ou quantité vide. Rien n’a été enregistré.', 'real-stock-manager-for-woocommerce' );
-
-			return null;
-		}
-
-		$report = Allocator::withdraw( $product_id, $quantity, $reason );
-
-		Journal::add(
-			array(
-				'time'   => time(),
-				'user'   => wp_get_current_user()->display_name,
-				'type'   => 'out',
-				'label'  => self::reference_label( $product_id ),
-				'qty'    => $report['du_libre'] + $report['repris'],
-				'orders' => $report['repris'],
-				'libre'  => $report['libre'],
+				'qty'    => $moved,
+				'orders' => $affected,
+				'libre'  => (int) $report['libre'],
 				'motif'  => $reason,
 			)
 		);
 
-		return $report;
+		return array(
+			'direction' => $direction,
+			'report'    => $report,
+			'context'   => ReferenceContext::describe( $product_id ),
+		);
 	}
 
 	/**

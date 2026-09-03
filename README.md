@@ -153,6 +153,28 @@ Abaisser cette priorité sous 5 casserait la détection sans aucun signal.
 **Retour arrière** : réactiver le snippet. Le module se remet en veille au chargement suivant,
 les données n'ayant bougé dans aucun sens.
 
+### Interface
+
+La page *Gestion du stock* est une **console de mouvement** : un formulaire unique avec sélecteur
+Entrée/Retrait, et un panneau qui se renseigne en AJAX dès qu'une référence est choisie (stock libre,
+reste à préparer, commandes en attente, la plus ancienne). Le journal est filtrable par sens.
+
+Le socle visuel n'introduit **aucune chaîne de build**. Il repose sur trois choses vérifiées dans
+les sources de WordPress 7.1 et WooCommerce 11 :
+
+- les **jetons `--wpds-*`** de la feuille `wp-theme`, déclarée en dépendance et systématiquement
+  écrite avec une valeur de repli — `var(--wpds-border-radius-lg, 8px)` ;
+- les **boutons du cœur** (`.button`, `.button-primary`), qui suivent déjà la refonte WordPress 7.0
+  (40 px de haut, rayon 2 px, anneaux de focus) ;
+- une **carte maison** reprenant les valeurs exactes de la Card de Gutenberg.
+
+Attention : `.components-card` ne produit **aucun** style depuis PHP — Card, Flex et Text sont passés
+en CSS-in-JS. Seuls `components-button`, `components-notice`, `components-panel`, `components-badge`
+et `components-spinner` sont du CSS statique réellement utilisable sans React.
+
+Le conteneur des deux pages doit porter la classe `woocommerce` : tout le style de formulaire de
+WooCommerce y est scopé.
+
 ### Réglages
 
 `Config` résout chaque réglage dans cet ordre : **constante `MH_PREP_*` → option `rsmw_*` → défaut**.

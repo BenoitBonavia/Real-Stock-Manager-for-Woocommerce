@@ -12,6 +12,7 @@ use RSMW\Preparation\Admin\Metabox;
 use RSMW\Preparation\Admin\OrdersColumn;
 use RSMW\Preparation\Admin\Pages;
 use RSMW\Preparation\Admin\ProductFields;
+use RSMW\Preparation\Admin\ReferenceContext;
 use RSMW\Preparation\Allocator;
 use RSMW\Preparation\Demand;
 use RSMW\Preparation\SnippetGuard;
@@ -72,6 +73,7 @@ final class OrderPreparation extends AbstractModule {
 		if ( is_admin() ) {
 			Metabox::register();
 			Ajax::register();
+			ReferenceContext::register();
 			OrdersColumn::register();
 			Pages::register();
 			ProductFields::register();

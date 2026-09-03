@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,6 +44,14 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
 
+= 0.3.0 =
+* Refonte de la page « Gestion stock » en console de mouvement : un seul formulaire avec sélecteur Entrée/Retrait, au lieu de deux formulaires dupliqués.
+* Panneau de contexte : la sélection d'une référence affiche son stock libre, ce qu'il reste à préparer, le nombre de commandes en attente et la plus ancienne d'entre elles.
+* Journal des mouvements filtrable par sens et par recherche.
+* Socle visuel aligné sur les écrans WooCommerce récents : cartes aux valeurs Gutenberg, boutons du cœur, jetons de design --wpds-* de WordPress 7.1 avec valeurs de repli.
+* Page « Besoins & stock » réalignée sur le même socle.
+* Correctif : le conteneur des deux pages porte désormais la classe « woocommerce », sans laquelle les styles de formulaire de WooCommerce ne s'appliquaient pas.
+
 = 0.2.0 =
 * Module « Préparation des commandes & stock physique » : reprise intégrale du snippet, sans migration de données.
 * Statut de commande « À empaqueter », métabox de pointage, colonne d'avancement sur la liste des commandes.
@@ -59,6 +67,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.3.0 =
+Refonte de l’interface de gestion du stock. Aucune donnée n’est modifiée, aucune action requise.
 
 = 0.2.0 =
 Mettez à jour l’extension AVANT de désactiver le snippet : la configuration est reprise depuis ses constantes tant qu’il est encore actif. Le module reste en veille jusqu’à sa désactivation.
