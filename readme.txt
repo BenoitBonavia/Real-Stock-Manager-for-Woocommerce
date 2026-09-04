@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.6.0
+Stable tag: 0.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,14 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 0.6.1 =
+* Nouvelle colonne « Précommande » dans la liste des commandes, après « Préparation » : une commande contenant des articles précommandés se repère en balayant la liste, sans cliquer sur la vue. Elle affiche aussi la date d’expédition annoncée.
+* Le marqueur ne lit aucun statut : il reste affiché quand la commande passe en préparation, puis expédiée, puis terminée — là où la colonne « Préparation » se tait. C’est ce que la suppression de la bascule automatique de statut avait fait perdre en 0.6.0.
+* Le mot « Précommande » est écrit en clair dans la puce : l’information ne repose jamais sur la seule couleur. Le orange reste réservé aux commandes fournisseur.
+* La date annoncée est désormais rafraîchie quand une ligne de précommande est ajoutée à une commande déjà marquée. Elle restait figée à sa première valeur.
+* Métas de précommande lisibles sur la fiche de commande et dans l’aperçu : « Quantité précommandée » et « Précommande levée le » remplacent les clés techniques, et la date figée en doublon est masquée. Ces écrans affichent les métas soulignées, contrairement au front, aux emails et à l’espace client.
+* Nettoyage de deux sélecteurs CSS hérités des snippets, qui ne correspondaient à aucun balisage de WooCommerce.
 
 = 0.6.0 =
 * Nouveau module « Précommandes », qui remplace cinq snippets : statut de commande, date d’expédition estimée, texte de disponibilité, libellé du bouton d’achat, badge promo et vue « À traiter ».
@@ -96,6 +104,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.6.1 =
+Colonne « Précommande » dans la liste des commandes. Aucune donnée n’est modifiée. Si la colonne n’apparaît pas, vérifiez « Options de l’écran » en haut de la liste.
 
 = 0.6.0 =
 Nouveau module Précommandes. Mettez à jour AVANT de désactiver les cinq snippets : le module reste en veille tant qu’ils sont actifs, et la reprise de l’historique démarre dès la mise à jour. Aucun statut de commande n’est modifié.

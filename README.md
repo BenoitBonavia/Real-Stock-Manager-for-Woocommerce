@@ -242,6 +242,58 @@ Le module sépare donc les deux :
 Conséquence directe : **aucune bascule automatique de statut**. Le statut « Précommande » reste
 enregistré et sélectionnable à la main, et les commandes qui le portent déjà le gardent.
 
+### Ce que la bascule faisait bien, et qu'il a fallu rendre
+
+La bascule automatique avait une vertu : elle colorait la colonne Statut, donc le marchand repérait
+ses précommandes en balayant la liste. La supprimer a laissé un trou — plus aucun marqueur visuel,
+seulement un lien de vue à cliquer.
+
+D'où la colonne **« Précommande »**, insérée après « Préparation ». Elle ne lit **que** le drapeau de
+commande `_rsmw_has_preorder`, jamais un statut : c'est la garantie mécanique qu'une commande expédiée
+ou terminée affiche encore sa puce, là précisément où la colonne « Préparation » se tait.
+
+```
+ ☐  Commande            Date      Statut       Préparation    Précommande            Total
+ ─────────────────────────────────────────────────────────────────────────────────────────────
+ ☐  #14827 C. Dubois    2 sept.   [En cours]   ▰▰▰▱▱ 2/4 +1   ● Précommande 12 oct.  184,50 €
+ ☐  #14826 M. Ferrand   2 sept.   [Expédiée]   ·              ● Précommande 30 sept.  62,00 €
+ ☐  #14825 A. Roy       1 sept.   [En cours]   ▰▰▰▰▰ 3/3      ·                      118,90 €
+```
+
+Trois contraintes ont dicté la forme :
+
+**Abscisse fixe.** Un marqueur greffé sur le numéro de commande ou sur la pastille de statut flotte
+horizontalement selon la longueur du nom de l'acheteur. Une colonne crée une bande où l'œil ne
+distingue que deux formes — la puce, ou le point médian.
+
+**Un mot, pas une couleur.** « Précommande » est écrit en clair ; le bordeaux et la puce ronde ne sont
+que des accélérateurs de balayage. C'est aussi ce qui a écarté la classe CSS sur le `<tr>` : signal
+purement chromatique, et disponible sous HPOS seulement.
+
+**Coût nul par ligne.** On lit deux métas *de commande*, jamais les lignes. Sous HPOS elles sont déjà
+en mémoire — `CustomMetaDataStore::get_meta_data_for_object_ids()` charge celles des vingt commandes
+de l'écran en une requête. Passer par `Marker::order_has_marked_line()` aurait coûté une soixantaine
+d'objets de ligne sous HPOS, et de l'ordre de cent cinquante requêtes en stockage historique.
+
+Le corollaire est assumé : **la couverture du marqueur vaut exactement celle du marquage**. Une
+commande que la reprise d'historique n'a pas pu marquer n'affiche rien — et n'apparaît pas non plus
+dans la vue « Précommandes ». C'est le test de diagnostic : si une commande manque dans la vue, le
+problème est le marquage, pas l'affichage.
+
+L'ordre « Statut | Préparation | Précommande » tient sur les deux modes de stockage sans jamais nommer
+la clé de la colonne Préparation, qui est une constante privée d'un autre module — voir le commentaire
+de `PreOrder\Admin\OrdersColumn::add_column()`, les deux mécanismes diffèrent.
+
+### Métas lisibles sur la fiche de commande
+
+L'écran de modification d'une commande et la modale d'aperçu appellent `get_all_formatted_meta_data( '' )`
+— **préfixe vide**. Contrairement au front, aux emails et à l'espace client, ils n'écartent donc pas
+les clés soulignées. Sans traitement, le marchand y lit `_rsmw_preorder_qty: 2`.
+
+`PreOrder\Admin\ItemMeta` masque ce qui fait doublon et renomme le reste : « Quantité précommandée »,
+« Précommande levée le » avec l'horodatage mis en forme. Aucun risque de fuite côté client — en front
+la boucle écarte les clés soulignées **avant** d'appliquer le filtre de libellé.
+
 ### Métas posées
 
 | Donnée | Clé | Emplacement |

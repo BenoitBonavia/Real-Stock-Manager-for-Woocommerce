@@ -246,11 +246,8 @@ final class Marker {
 			return;
 		}
 
-		if ( $order->get_meta( Legacy::ORDER_FLAG_META ) ) {
-			return;
-		}
-
-		$latest = '';
+		$flagged = '' !== (string) $order->get_meta( Legacy::ORDER_FLAG_META );
+		$latest  = '';
 
 		foreach ( $order->get_items() as $item ) {
 			if ( self::line_preorder_quantity( $item ) <= 0 ) {
@@ -269,13 +266,28 @@ final class Marker {
 			return;
 		}
 
-		$order->update_meta_data( Legacy::ORDER_FLAG_META, 1 );
+		$changed = false;
 
-		if ( '' !== $latest ) {
-			$order->update_meta_data( Legacy::ORDER_DATE_MAX_META, $latest );
+		if ( ! $flagged ) {
+			$order->update_meta_data( Legacy::ORDER_FLAG_META, 1 );
+			$changed = true;
 		}
 
-		$order->save();
+		/*
+		 * Le drapeau est un fait acquis, la date est une promesse. Une ligne de
+		 * précommande ajoutée après coup en back-office peut repousser l'échéance :
+		 * on ne sort donc PAS en tête quand le drapeau existe déjà, sans quoi la
+		 * date resterait figée à sa première valeur. Comme elle est maintenant
+		 * affichée dans la liste des commandes, elle doit rester juste.
+		 */
+		if ( '' !== $latest && $latest !== (string) $order->get_meta( Legacy::ORDER_DATE_MAX_META ) ) {
+			$order->update_meta_data( Legacy::ORDER_DATE_MAX_META, $latest );
+			$changed = true;
+		}
+
+		if ( $changed ) {
+			$order->save();
+		}
 	}
 
 	/**
@@ -320,6 +332,65 @@ final class Marker {
 	 */
 	public static function line_preorder_quantity( $item ): int {
 		return max( 0, (int) $item->get_meta( Legacy::ITEM_QTY_META ) );
+	}
+
+	/**
+	 * Cette commande contient-elle des articles précommandés ?
+	 *
+	 * Lit le drapeau posé au niveau de la COMMANDE, jamais les lignes. C'est toute
+	 * la raison d'être de ce drapeau : sur une liste de vingt commandes,
+	 * order_has_marked_line() instancierait une soixantaine d'objets de ligne sous
+	 * HPOS, et coûterait environ cent cinquante requêtes en stockage historique,
+	 * pour un booléen déjà chargé avec la commande.
+	 *
+	 * Corollaire assumé : la couverture de ce marqueur vaut exactement celle du
+	 * marquage. Une commande que la reprise d'historique n'a pas pu marquer
+	 * n'affichera rien — elle n'apparaît pas non plus dans la vue « Précommandes ».
+	 *
+	 * @param \WC_Order|int $order_or_id Commande (HPOS) ou identifiant (historique).
+	 *
+	 * @return bool
+	 */
+	public static function order_has_preorder( $order_or_id ): bool {
+		return '' !== self::order_meta( $order_or_id, Legacy::ORDER_FLAG_META );
+	}
+
+	/**
+	 * Date d'expédition annoncée la plus lointaine de la commande.
+	 *
+	 * @param \WC_Order|int $order_or_id Commande (HPOS) ou identifiant (historique).
+	 *
+	 * @return string Format AAAA-MM-JJ, chaîne vide si aucune ligne ne portait de date.
+	 */
+	public static function order_preorder_date( $order_or_id ): string {
+		return self::order_meta( $order_or_id, Legacy::ORDER_DATE_MAX_META );
+	}
+
+	/**
+	 * Lit une méta de commande au coût le plus bas selon le mode de stockage.
+	 *
+	 * Sous HPOS l'objet arrive déjà hydraté : la liste des commandes charge les
+	 * métas de ses vingt commandes en UNE requête groupée
+	 * (CustomMetaDataStore::get_meta_data_for_object_ids), puis les injecte dans
+	 * chaque objet. get_meta() n'est donc qu'un parcours de tableau.
+	 *
+	 * En stockage historique on ne reconstruit surtout PAS un WC_Order :
+	 * get_post_meta() est servi par le cache que WP_Query vient d'amorcer, là où
+	 * wc_get_order() referait toute la lecture de la commande.
+	 *
+	 * @param \WC_Order|int $order_or_id Commande ou identifiant.
+	 * @param string        $key         Clé de méta.
+	 *
+	 * @return string
+	 */
+	private static function order_meta( $order_or_id, string $key ): string {
+		if ( $order_or_id instanceof \WC_Order ) {
+			return (string) $order_or_id->get_meta( $key );
+		}
+
+		$id = absint( $order_or_id );
+
+		return $id > 0 ? (string) get_post_meta( $id, $key, true ) : '';
 	}
 
 	/**

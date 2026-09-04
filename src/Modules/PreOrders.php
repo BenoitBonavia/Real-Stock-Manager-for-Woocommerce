@@ -7,6 +7,8 @@
 
 namespace RSMW\Modules;
 
+use RSMW\PreOrder\Admin\ItemMeta;
+use RSMW\PreOrder\Admin\OrdersColumn;
 use RSMW\PreOrder\Admin\OrdersView;
 use RSMW\PreOrder\Admin\ProductDateField;
 use RSMW\PreOrder\Front;
@@ -70,7 +72,13 @@ final class PreOrders extends AbstractModule {
 
 		if ( is_admin() ) {
 			ProductDateField::register();
+
+			// La vue filtre, la colonne confirme ligne à ligne : les deux doivent
+			// apparaître et disparaître ensemble avec le module.
 			OrdersView::register();
+			OrdersColumn::register();
+
+			ItemMeta::register();
 			Migration::register();
 		}
 	}

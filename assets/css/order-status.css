@@ -5,14 +5,18 @@
  * (cf. RSMW\Preparation\Legacy::STATUS_SLUG).
  */
 
-.order-status.status-mh-empaqueter,
-mark.mh-empaqueter {
+/*
+ * WooCommerce rend la pastille en `<mark class="order-status status-{slug}">`
+ * (Internal/Admin/Orders/ListTable.php). Les sélecteurs `mark.{slug}` qui
+ * figuraient ici ne correspondaient à rien : vestiges des snippets remplacés,
+ * retirés pour ne pas laisser croire qu'un second marqueur est déjà stylé.
+ */
+.order-status.status-mh-empaqueter {
 	background: #e8dcff;
 	color: #4b2e83;
 }
 
-.order-status.status-precommande,
-mark.precommande {
+.order-status.status-precommande {
 	background: #f7ebed;
 	color: #9b1b30;
 }
@@ -71,4 +75,78 @@ mark.precommande {
 
 .rsmw-prep-progress__none {
 	color: #c3c4c7;
+}
+
+/*
+ * Marqueur « Précommande » de la liste des commandes.
+ *
+ * Le bordeaux #f7ebed / #9b1b30 est déjà, en tête de cette feuille, celui de la
+ * pastille du statut « Précommande » : le marchand a appris cette teinte avec le
+ * snippet remplacé, on la lui rend sans réintroduire la bascule automatique de
+ * statut. Le orange #d98500 reste intégralement réservé à « commandé au
+ * fournisseur » — les deux axes doivent pouvoir se lire séparément sur la même
+ * ligne.
+ *
+ * Forme délibérément DIFFÉRENTE de .order-status — puce plate, pas pastille
+ * pleine hauteur — pour qu'on ne la lise pas comme un second statut de commande.
+ */
+.rsmw-preorder-flag {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 5px;
+	padding: 1px 7px;
+	border-radius: 3px;
+	background: #f7ebed;
+	color: #9b1b30;
+	line-height: 1.8;
+	white-space: nowrap;
+}
+
+/*
+ * Seconde signature, non chromatique : la puce reste repérable en niveaux de
+ * gris. L'information, elle, est portée par le MOT — jamais par la seule couleur.
+ */
+.rsmw-preorder-flag__dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentColor;
+	align-self: center;
+	flex: none;
+}
+
+.rsmw-preorder-flag__label {
+	font-weight: 600;
+}
+
+/* Chiffres à chasse fixe : les dates s'alignent d'une ligne à l'autre, ce qui est
+   tout l'intérêt d'une colonne à abscisse fixe. */
+.rsmw-preorder-flag__date {
+	font-variant-numeric: tabular-nums;
+	opacity: 0.8;
+}
+
+/* Même gris d'absence que la colonne « Préparation » : les deux colonnes se
+   taisent de la même façon. */
+.rsmw-preorder-flag__none {
+	color: #c3c4c7;
+}
+
+/* En contraste forcé le fond disparaît ; le contour et le mot restent. */
+@media ( forced-colors: active ) {
+	.rsmw-preorder-flag {
+		border: 1px solid CanvasText;
+	}
+}
+
+/* Largeur de la puce la plus longue : « Précommande » suivi d'une date courte. */
+.wp-list-table .column-rsmw_preorder {
+	width: 11em;
+}
+
+@media screen and ( max-width: 782px ) {
+	/* WordPress empile les colonnes sur petit écran : on rend la largeur. */
+	.wp-list-table .column-rsmw_preorder {
+		width: auto;
+	}
 }
