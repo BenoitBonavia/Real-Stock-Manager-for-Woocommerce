@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.7.0
+Stable tag: 0.7.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 0.7.1 =
+* Page « Besoins & stock » : la case « Manquants uniquement » est cochée d’entrée. La page sert d’abord à savoir quoi commander ; le filtre est appliqué dès le chargement, indicateurs compris.
 
 = 0.7.0 =
 * La bascule automatique vers le statut « Précommande » est de retour, en option (Réglages → Précommandes → Statut automatique, décochée par défaut). Une commande contenant des articles précommandés reçoit désormais le marqueur ET le statut.
@@ -122,6 +125,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.7.1 =
+La case « Manquants uniquement » de Besoins & stock est cochée par défaut. Décochez-la pour retrouver la totalité des références.
 
 = 0.7.0 =
 La bascule automatique de statut revient, en option et décochée par défaut. Pour l’activer : ajoutez « precommande » aux Statuts à préparer, PUIS cochez Statut automatique. Le statut compte désormais comme payé, ce qui fait remonter le chiffre d’affaires des précommandes dans vos rapports, y compris passés.

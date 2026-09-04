@@ -103,6 +103,14 @@
 	onlyLack.addEventListener( 'change', refresh );
 	onlyStock.addEventListener( 'change', refresh );
 
+	/*
+	 * Application immédiate des filtres cochés d'entrée — « Manquants uniquement »
+	 * l'est. Sans cet appel, la case serait cochée devant un tableau complet, et
+	 * les indicateurs compteraient des lignes que le filtre est censé masquer :
+	 * le rendu serveur les calcule sur la totalité des références.
+	 */
+	refresh();
+
 	table.querySelectorAll( 'th[data-key]' ).forEach( function ( th ) {
 		th.addEventListener( 'click', function () {
 			var key = th.dataset.key;

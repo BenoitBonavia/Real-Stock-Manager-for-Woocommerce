@@ -266,7 +266,8 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 			<div class="rsmw-toolbar">
 				<label class="screen-reader-text" for="mh-search"><?php esc_html_e( 'Rechercher une référence', 'real-stock-manager-for-woocommerce' ); ?></label>
 				<input type="search" id="mh-search" placeholder="<?php esc_attr_e( 'Rechercher (nom, taille, SKU…)', 'real-stock-manager-for-woocommerce' ); ?>" autocomplete="off">
-				<label><input type="checkbox" id="mh-only-lack"> <?php esc_html_e( 'Manquants uniquement', 'real-stock-manager-for-woocommerce' ); ?></label>
+				<?php /* Coché d'entrée : la page sert d'abord à savoir quoi commander. Le script applique le filtre au chargement, sans quoi la case serait cochée devant un tableau complet. */ ?>
+				<label><input type="checkbox" id="mh-only-lack" checked> <?php esc_html_e( 'Manquants uniquement', 'real-stock-manager-for-woocommerce' ); ?></label>
 				<label><input type="checkbox" id="mh-only-stock"> <?php esc_html_e( 'Avec stock libre', 'real-stock-manager-for-woocommerce' ); ?></label>
 				<a class="button" id="mh-export" href="#" data-filename="<?php esc_attr_e( 'besoins-stock', 'real-stock-manager-for-woocommerce' ); ?>">
 					<?php esc_html_e( 'Exporter en CSV', 'real-stock-manager-for-woocommerce' ); ?>
