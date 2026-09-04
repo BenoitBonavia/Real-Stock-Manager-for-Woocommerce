@@ -9,6 +9,7 @@ namespace RSMW\Admin;
 
 use RSMW\Modules\ModuleInterface;
 use RSMW\Plugin;
+use RSMW\PreOrder\Legacy as PreOrderLegacy;
 use RSMW\PreOrder\Migration as PreOrderMigration;
 use RSMW\PreOrder\OrderStatus as PreOrderStatus;
 use RSMW\PreOrder\SnippetGuard as PreOrderSnippetGuard;
@@ -275,6 +276,22 @@ final class SettingsTab extends \WC_Settings_Page {
 
 		if ( ! PreOrderMigration::is_done() ) {
 			$lines[] = esc_html__( 'Reprise de l’historique des précommandes en cours : elle avance à chaque chargement de l’administration.', 'real-stock-manager-for-woocommerce' );
+		}
+
+		/*
+		 * Piège silencieux : le statut « Précommande » n'est pas suivi par défaut.
+		 * Une commande qu'on y place sort alors du circuit de préparation — elle
+		 * disparaît de « Besoins & stock », l'entrée de stock ne lui attribue plus
+		 * rien, et sa barre d'avancement se tait. Rien ne le signale à l'écran :
+		 * la commande a juste l'air d'aller bien. D'où cet avertissement, qui ne
+		 * se déclenche que si des commandes portent effectivement le statut.
+		 */
+		if ( PreOrderStatus::order_count() > 0 && ! in_array( PreOrderLegacy::STATUS_SLUG, Config::statuses(), true ) ) {
+			$lines[] = '<strong style="color:#b32d2e">' . sprintf(
+				/* translators: %s: slug du statut de précommande. */
+				esc_html__( 'Des commandes portent le statut « Précommande », qui ne figure pas dans les statuts suivis ci-dessous : elles sont hors du circuit de préparation — absentes de « Besoins & stock », et l’entrée de stock ne leur attribue rien. Ajoutez %s aux statuts suivis, ou ne vous servez pas de ce statut : le marquage des précommandes n’en dépend pas.', 'real-stock-manager-for-woocommerce' ),
+				'<code>' . esc_html( PreOrderLegacy::STATUS_SLUG ) . '</code>'
+			) . '</strong>';
 		}
 
 		$statuses = Config::statuses();

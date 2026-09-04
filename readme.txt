@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.6.2
+Stable tag: 0.6.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 0.6.3 =
+* Le panneau de diagnostic alerte quand des commandes portent le statut « Précommande » alors que ce statut ne figure pas dans les statuts suivis. Ces commandes sont alors hors du circuit de préparation : absentes de « Besoins & stock », et l’entrée de stock ne leur attribue rien. Rien ne le signalait à l’écran — la commande avait simplement l’air d’aller bien.
 
 = 0.6.2 =
 * Correctif : `ds_change_sale_text` ne fait plus partie des sentinelles qui mettent le module Précommandes en veille. Ce snippet ne surcharge que le libellé du badge promotionnel — il ne crée ni statut, ni méta, ni vue — mais son nom est générique et un marchand peut légitimement le réutiliser pour une règle sans rapport, une catégorie « outlet » par exemple. Le module se mettait alors en veille et le statut « Précommande » n’était plus enregistré, faisant disparaître les commandes concernées des écrans d’administration.
@@ -109,6 +112,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.6.3 =
+Ajoute une alerte de diagnostic sur le statut « Précommande » laissé hors des statuts suivis. Aucune donnée n’est modifiée.
 
 = 0.6.2 =
 Correctif important si vous avez gardé une fonction nommée ds_change_sale_text : elle mettait le module Précommandes en veille et désenregistrait le statut « Précommande ». Aucune donnée n’est modifiée.
