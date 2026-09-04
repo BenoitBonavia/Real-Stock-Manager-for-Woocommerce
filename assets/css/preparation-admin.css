@@ -467,6 +467,21 @@
 	font-weight: 600;
 }
 
+/* Saisie de réception : plus déclaré qu'attendu. Signalé dès la frappe plutôt
+   qu'à la vérification, pour que la correction reste dans le geste. */
+.rsmw-reception--over td {
+	background: #fffdf5;
+}
+
+.rsmw-reception--over .rsmw-reception__ok,
+.rsmw-reception--over .rsmw-reception__defective {
+	border-color: var(--rsmw-warning);
+}
+
+.rsmw-table td .rsmw-field__input--qty {
+	width: 90px;
+}
+
 .rsmw-kpi--ordered .rsmw-kpi__value {
 	color: var(--rsmw-ordered);
 }

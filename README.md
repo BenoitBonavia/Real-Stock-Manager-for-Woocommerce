@@ -174,9 +174,28 @@ les données n'ayant bougé dans aucun sens.
 
 ### Interface
 
-La page *Gestion du stock* est une **console de mouvement** : un formulaire unique avec sélecteur
-Entrée/Retrait, et un panneau qui se renseigne en AJAX dès qu'une référence est choisie (stock libre,
-reste à préparer, commandes en attente, la plus ancienne). Le journal est filtrable par sens.
+La page *Gestion du stock* a deux onglets. **Réception d'un colis** liste ce qui est attendu et
+propose deux champs par référence, conforme et défectueux, avec vérification avant écriture.
+**Mouvement à l'unité** est la console : un formulaire unique à quatre sens, et un panneau qui se
+renseigne en AJAX dès qu'une référence est choisie. Le journal, commun aux deux onglets, est
+filtrable par sens.
+
+Les formulaires sont traités sur `load-{écran}`, avant l'envoi de l'en-tête d'administration —
+seule fenêtre où une redirection reste possible. Sans elle, un rafraîchissement rejouerait
+l'écriture, et sur une réception en lot c'est un colis entier qui serait enregistré deux fois.
+
+### Réception : ce qu'un défectueux ne doit pas faire
+
+Un article reçu défectueux **n'entre jamais en stock pour en ressortir aussitôt**. L'aller-retour
+paraît neutre, il ne l'est pas : `Allocator::receive()` sert les commandes de la plus **ancienne** à
+la plus récente, `Allocator::withdraw()` reprend de la plus **récente** à la plus ancienne. Le couple
+transfère donc du stock réel d'une commande vers une autre, avec deux changements de statut et deux
+notes sur des commandes étrangères au colis.
+
+Un défectueux passe par `Allocator::cancel_supplier_order()` : il cesse d'être attendu, sans toucher
+au stock physique ni aux statuts. La référence remonte alors dans « Reste à commander », où elle est
+visible. Le cumul par référence vit dans `Defects` — le journal, borné et destiné à l'exploitation
+courante, ne peut pas porter une réclamation fournisseur.
 
 Le socle visuel n'introduit **aucune chaîne de build**. Il repose sur trois choses vérifiées dans
 les sources de WordPress 7.1 et WooCommerce 11 :

@@ -26,6 +26,16 @@ final class Pages {
 		add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 60 );
 		add_filter( 'woocommerce_screen_ids', array( __CLASS__, 'declare_screens' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue' ) );
+
+		/*
+		 * Les formulaires de la page Gestion du stock sont traités ici, et non
+		 * dans la fonction de rendu : `load-{écran}` s'exécute avant l'envoi de
+		 * l'en-tête d'administration, seule fenêtre où une redirection reste
+		 * possible. Sans elle, un rafraîchissement rejouerait l'écriture.
+		 */
+		$screens = self::screen_ids();
+
+		add_action( 'load-' . $screens['stock'], array( StockPage::class, 'handle_post' ) );
 	}
 
 	/**
@@ -120,12 +130,34 @@ final class Pages {
 		}
 
 		if ( $screens['stock'] === $hook_suffix ) {
-			wp_enqueue_script( 'wc-enhanced-select' );
+
+			// Le journal est commun aux deux onglets.
+			wp_enqueue_script(
+				'rsmw-journal-filter',
+				RSMW_URL . 'assets/js/journal-filter.js',
+				array(),
+				RSMW_VERSION,
+				array( 'in_footer' => true )
+			);
+
+			if ( StockPage::TAB_MOVEMENT === StockPage::current_tab() ) {
+				wp_enqueue_script( 'wc-enhanced-select' );
+
+				wp_enqueue_script(
+					'rsmw-stock-movement',
+					RSMW_URL . 'assets/js/stock-movement.js',
+					array( 'jquery', 'wc-enhanced-select' ),
+					RSMW_VERSION,
+					array( 'in_footer' => true )
+				);
+
+				return;
+			}
 
 			wp_enqueue_script(
-				'rsmw-stock-movement',
-				RSMW_URL . 'assets/js/stock-movement.js',
-				array( 'jquery', 'wc-enhanced-select' ),
+				'rsmw-reception',
+				RSMW_URL . 'assets/js/reception.js',
+				array(),
 				RSMW_VERSION,
 				array( 'in_footer' => true )
 			);

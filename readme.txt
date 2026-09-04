@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.4.0
+Stable tag: 0.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,6 +44,14 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
 
+= 0.5.0 =
+* Nouvel onglet « Réception d’un colis » : la page Gestion du stock propose la liste de ce qui est attendu, avec deux champs par référence — conforme et défectueux.
+* Vérification avant écriture : le total, les commandes qui passeraient en « À empaqueter » et les anomalies s’affichent d’abord ; rien n’est enregistré tant que la réception n’est pas confirmée.
+* Les défectueux n’entrent jamais en stock : ils cessent d’être attendus et la référence remonte dans « Reste à commander ». Ils ne sont pas non plus reçus puis écartés — l’aller-retour aurait transféré du stock réel entre commandes clients, la réception servant les plus anciennes et le retrait reprenant aux plus récentes.
+* Cumul des défectueux par référence, exploitable pour une réclamation fournisseur.
+* Correctif : les formulaires de la page sont traités avant l’envoi de l’en-tête et suivis d’une redirection. Un rafraîchissement de page ne rejoue plus le mouvement — sur une réception en lot, c’était un colis entier qui pouvait être enregistré deux fois.
+* Le journal conserve 200 mouvements au lieu de 40, et chaque entrée porte l’identifiant de la référence et celui du colis.
+
 = 0.4.0 =
 * Suivi des commandes fournisseur : troisième état du stock, entre le manquant et le reçu.
 * Console de mouvement à quatre sens : Entrée, Commande fournisseur, Annulation, Retrait.
@@ -77,6 +85,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.5.0 =
+Nouvel écran de réception en lot. Aucune donnée existante n’est modifiée.
 
 = 0.4.0 =
 Nouveau suivi des commandes fournisseur. Aucune donnée existante n’est modifiée : les nouveaux compteurs démarrent à zéro, ce qui signifie « rien en commande ».

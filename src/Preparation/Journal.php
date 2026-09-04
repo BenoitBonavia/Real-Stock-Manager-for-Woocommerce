@@ -18,8 +18,12 @@ final class Journal {
 
 	/**
 	 * Nombre de mouvements conservés.
+	 *
+	 * Relevé de 40 à 200 avec l'arrivée de la réception en lot : un colis de
+	 * quinze références écrit jusqu'à trente entrées d'un coup et effaçait
+	 * l'historique complet en une validation.
 	 */
-	public const MAX_ENTRIES = 40;
+	public const MAX_ENTRIES = 200;
 
 	/**
 	 * Mouvements enregistrés, du plus récent au plus ancien.
@@ -34,6 +38,11 @@ final class Journal {
 
 	/**
 	 * Enregistre un mouvement.
+	 *
+	 * Les entrées portent désormais `product` (identifiant de la référence) et
+	 * `batch` (identifiant de réception) : sans le premier, le journal n'était
+	 * qu'un libellé d'affichage, ni requêtable ni cumulable ; le second permet de
+	 * rattacher entre elles les lignes d'un même colis.
 	 *
 	 * @param array $entry Mouvement.
 	 */

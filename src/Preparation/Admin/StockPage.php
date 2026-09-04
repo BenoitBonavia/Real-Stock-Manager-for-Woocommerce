@@ -1,6 +1,6 @@
 <?php
 /**
- * Page « Gestion stock » : console de mouvement.
+ * Page « Gestion du stock » : réception d'un colis et mouvements à l'unité.
  *
  * @package RealStockManager
  */
@@ -11,31 +11,126 @@ use RSMW\Preparation\Allocator;
 use RSMW\Preparation\Journal;
 use RSMW\Preparation\Labels;
 use RSMW\Preparation\Legacy;
+use RSMW\Preparation\Reception;
 use RSMW\Preparation\Stock;
 use RSMW\Preparation\Supply;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Saisie des mouvements de stock physique.
+ * Deux onglets : la réception d'un colis entier, et la console de mouvement à
+ * l'unité.
  *
- * Un seul formulaire porte les deux sens : une entrée est affectée aux commandes
- * les plus anciennes qui l'attendent, une sortie puise d'abord dans le stock
- * libre puis reprend aux commandes les plus récentes.
+ * Les formulaires sont traités sur `load-{écran}`, avant que WordPress n'ait
+ * envoyé l'en-tête de l'administration : c'est la seule fenêtre où une
+ * redirection reste possible. Sans elle, un simple rafraîchissement de page
+ * rejouerait le mouvement — sur un formulaire de réception, c'est un colis
+ * entier qui serait enregistré deux fois.
  */
 final class StockPage {
 
-	/** Nonce du formulaire de mouvement. */
-	private const NONCE = 'rsmw_stock_movement';
+	/** Onglet de réception, affiché par défaut. */
+	public const TAB_RECEPTION = 'reception';
+
+	/** Onglet de mouvement à l'unité. */
+	public const TAB_MOVEMENT = 'mouvement';
+
+	/** Nonce du formulaire de mouvement à l'unité. */
+	private const NONCE_MOVEMENT = 'rsmw_stock_movement';
+
+	/** Nonce du formulaire de réception. */
+	private const NONCE_RECEPTION = 'rsmw_reception';
 
 	/**
-	 * Sens autorisés.
+	 * Sens autorisés pour un mouvement à l'unité.
 	 *
 	 * `in` / `out` déplacent du stock physique ; `order` / `unorder` déplacent des
 	 * quantités commandées au fournisseur, sans marchandise et sans effet sur le
 	 * statut des commandes.
 	 */
 	private const DIRECTIONS = array( 'in', 'order', 'unorder', 'out' );
+
+	/**
+	 * Résultat d'une simulation de réception, conservé le temps de la requête.
+	 *
+	 * @var array|null
+	 */
+	private static $simulation = null;
+
+	/**
+	 * Saisie à réafficher après une simulation.
+	 *
+	 * @var array
+	 */
+	private static $submitted = array();
+
+	/**
+	 * Onglet courant.
+	 *
+	 * @return string
+	 */
+	public static function current_tab(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- simple lecture de contexte d'affichage.
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : self::TAB_RECEPTION;
+
+		return in_array( $tab, array( self::TAB_RECEPTION, self::TAB_MOVEMENT ), true ) ? $tab : self::TAB_RECEPTION;
+	}
+
+	/**
+	 * Adresse de l'onglet demandé.
+	 *
+	 * @param string $tab Onglet.
+	 *
+	 * @return string
+	 */
+	public static function tab_url( string $tab ): string {
+		return admin_url( 'admin.php?page=' . Legacy::PAGE_STOCK . '&tab=' . $tab );
+	}
+
+	/**
+	 * Traite les formulaires avant tout affichage.
+	 *
+	 * Accroché sur `load-{écran}` : c'est le seul moment où une redirection est
+	 * encore possible, l'en-tête de l'administration n'ayant pas été envoyé.
+	 */
+	public static function handle_post(): void {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+
+		if ( isset( $_POST['rsmw_reception_check'] ) ) {
+			check_admin_referer( self::NONCE_RECEPTION );
+
+			self::$submitted  = self::read_reception_input();
+			self::$simulation = Reception::simulate( self::$submitted );
+
+			return;
+		}
+
+		if ( isset( $_POST['rsmw_reception_submit'] ) ) {
+			check_admin_referer( self::NONCE_RECEPTION );
+
+			$report = Reception::apply( self::read_reception_input() );
+
+			self::flash( array( 'reception' => $report ) );
+			self::redirect( self::TAB_RECEPTION );
+		}
+
+		if ( isset( $_POST['rsmw_stock_submit'] ) ) {
+			check_admin_referer( self::NONCE_MOVEMENT );
+
+			$errors   = array();
+			$movement = self::handle_movement( $errors );
+
+			self::flash(
+				array(
+					'movement' => $movement,
+					'errors'   => $errors,
+				)
+			);
+			self::redirect( self::TAB_MOVEMENT );
+		}
+	}
 
 	/**
 	 * Affiche la page.
@@ -45,20 +140,70 @@ final class StockPage {
 			wp_die( esc_html__( 'Droits insuffisants.', 'real-stock-manager-for-woocommerce' ) );
 		}
 
-		$errors   = array();
-		$movement = self::handle_movement( $errors );
+		$flash = self::take_flash();
 
+		if ( self::TAB_MOVEMENT === self::current_tab() ) {
+			self::render_movement( $flash );
+
+			return;
+		}
+
+		self::render_reception( $flash );
+	}
+
+	/**
+	 * Onglet « Réception d'un colis ».
+	 *
+	 * @param array $flash Compte rendu d'une réception venant d'être enregistrée.
+	 */
+	private static function render_reception( array $flash ): void {
+		View::render(
+			'reception-page',
+			array(
+				'tab'            => self::TAB_RECEPTION,
+				'tabs'           => self::tabs(),
+				'pending'        => Reception::pending(),
+				'submitted'      => self::$submitted,
+				'simulation'     => self::$simulation,
+				'report'         => isset( $flash['reception'] ) ? $flash['reception'] : null,
+				'nonce_field'    => wp_nonce_field( self::NONCE_RECEPTION, '_wpnonce', true, false ),
+				'journal'        => Journal::all(),
+				'needs_page_url' => admin_url( 'admin.php?page=' . Legacy::PAGE_NEEDS ),
+			)
+		);
+	}
+
+	/**
+	 * Onglet « Mouvement à l'unité ».
+	 *
+	 * @param array $flash Compte rendu d'un mouvement venant d'être enregistré.
+	 */
+	private static function render_movement( array $flash ): void {
 		View::render(
 			'stock-page',
 			array(
-				'movement'       => $movement,
-				'errors'         => $errors,
+				'tab'            => self::TAB_MOVEMENT,
+				'tabs'           => self::tabs(),
+				'movement'       => isset( $flash['movement'] ) ? $flash['movement'] : null,
+				'errors'         => isset( $flash['errors'] ) ? (array) $flash['errors'] : array(),
 				'journal'        => Journal::all(),
 				'reasons'        => self::reasons(),
-				'nonce_field'    => wp_nonce_field( self::NONCE, '_wpnonce', true, false ),
+				'nonce_field'    => wp_nonce_field( self::NONCE_MOVEMENT, '_wpnonce', true, false ),
 				'search_nonce'   => wp_create_nonce( 'search-products' ),
 				'needs_page_url' => admin_url( 'admin.php?page=' . Legacy::PAGE_NEEDS ),
 			)
+		);
+	}
+
+	/**
+	 * Libellés des onglets.
+	 *
+	 * @return array<string, string>
+	 */
+	private static function tabs(): array {
+		return array(
+			self::TAB_RECEPTION => __( 'Réception d’un colis', 'real-stock-manager-for-woocommerce' ),
+			self::TAB_MOVEMENT  => __( 'Mouvement à l’unité', 'real-stock-manager-for-woocommerce' ),
 		);
 	}
 
@@ -78,19 +223,45 @@ final class StockPage {
 	}
 
 	/**
-	 * Traite le formulaire de mouvement.
+	 * Lit la saisie du tableau de réception.
+	 *
+	 * Le nonce est vérifié par l'appelant.
+	 *
+	 * @return array<int, array{ok:int, defective:int}>
+	 */
+	private static function read_reception_input(): array {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par l'appelant.
+		$raw = isset( $_POST['rsmw_reception'] ) ? wp_unslash( $_POST['rsmw_reception'] ) : array();
+
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+
+		$rows = array();
+
+		foreach ( $raw as $product_id => $quantities ) {
+			if ( ! is_array( $quantities ) ) {
+				continue;
+			}
+
+			$rows[ (int) $product_id ] = array(
+				'ok'        => isset( $quantities['ok'] ) ? absint( $quantities['ok'] ) : 0,
+				'defective' => isset( $quantities['defective'] ) ? absint( $quantities['defective'] ) : 0,
+			);
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Traite le formulaire de mouvement à l'unité.
 	 *
 	 * @param array $errors Messages d'erreur, complétés par référence.
 	 *
 	 * @return array|null Sens et compte rendu, ou null si aucune demande.
 	 */
 	private static function handle_movement( array &$errors ): ?array {
-		if ( ! isset( $_POST['rsmw_stock_submit'] ) ) {
-			return null;
-		}
-
-		check_admin_referer( self::NONCE );
-
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- vérifié par l'appelant.
 		$direction = isset( $_POST['rsmw_movement_direction'] )
 			? sanitize_key( wp_unslash( $_POST['rsmw_movement_direction'] ) )
 			: '';
@@ -119,6 +290,7 @@ final class StockPage {
 		$reason = 'out' === $direction && isset( $_POST['rsmw_movement_reason'] )
 			? sanitize_text_field( wp_unslash( $_POST['rsmw_movement_reason'] ) )
 			: '';
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		switch ( $direction ) {
 			case 'in':
@@ -151,6 +323,7 @@ final class StockPage {
 				'time'     => time(),
 				'user'     => wp_get_current_user()->display_name,
 				'type'     => $direction,
+				'product'  => $product_id,
 				'label'    => self::reference_label( $product_id ),
 				'qty'      => $moved,
 				'orders'   => $affected,
@@ -167,6 +340,43 @@ final class StockPage {
 			'report'    => $report,
 			'context'   => ReferenceContext::describe( $product_id ),
 		);
+	}
+
+	/**
+	 * Mémorise un compte rendu le temps d'une redirection.
+	 *
+	 * @param array $payload Données à réafficher.
+	 */
+	private static function flash( array $payload ): void {
+		set_transient( 'rsmw_stock_flash_' . get_current_user_id(), $payload, 5 * MINUTE_IN_SECONDS );
+	}
+
+	/**
+	 * Récupère et consomme le compte rendu mémorisé.
+	 *
+	 * @return array
+	 */
+	private static function take_flash(): array {
+		$key   = 'rsmw_stock_flash_' . get_current_user_id();
+		$flash = get_transient( $key );
+
+		if ( ! is_array( $flash ) ) {
+			return array();
+		}
+
+		delete_transient( $key );
+
+		return $flash;
+	}
+
+	/**
+	 * Redirige vers l'onglet, pour qu'un rafraîchissement ne rejoue pas l'écriture.
+	 *
+	 * @param string $tab Onglet.
+	 */
+	private static function redirect( string $tab ): void {
+		wp_safe_redirect( self::tab_url( $tab ) );
+		exit;
 	}
 
 	/**

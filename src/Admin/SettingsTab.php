@@ -10,6 +10,7 @@ namespace RSMW\Admin;
 use RSMW\Modules\ModuleInterface;
 use RSMW\Plugin;
 use RSMW\Preparation\Config;
+use RSMW\Preparation\Defects;
 use RSMW\Preparation\Items;
 use RSMW\Preparation\Journal;
 use RSMW\Preparation\OrderStatus;
@@ -245,6 +246,13 @@ final class SettingsTab extends \WC_Settings_Page {
 			esc_html__( 'Commandes fournisseur — références avec une commande en cours : %1$s · lignes de commande couvertes : %2$s', 'real-stock-manager-for-woocommerce' ),
 			'<strong>' . esc_html( number_format_i18n( Supply::tracked_reference_count() ) ) . '</strong>',
 			'<strong>' . esc_html( number_format_i18n( Items::ordered_line_count() ) ) . '</strong>'
+		);
+
+		$lines[] = sprintf(
+			/* translators: 1: nombre de références, 2: nombre total d'articles. */
+			esc_html__( 'Défectueux constatés à la réception — références concernées : %1$s · articles au total : %2$s', 'real-stock-manager-for-woocommerce' ),
+			'<strong>' . esc_html( number_format_i18n( Defects::tracked_reference_count() ) ) . '</strong>',
+			'<strong>' . esc_html( number_format_i18n( Defects::total() ) ) . '</strong>'
 		);
 
 		$statuses = Config::statuses();
