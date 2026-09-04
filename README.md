@@ -121,6 +121,25 @@ Remplace le snippet WPCode « Maison Hespérides — Préparation ». Gère un s
 distinct du stock WooCommerce : statut de commande « À empaqueter », métabox de pointage,
 pages *Besoins & stock* et *Gestion stock*, attribution FIFO, champs de stock sur les produits.
 
+### Les trois états du stock
+
+| État | Couleur | Clé produit | Clé ligne de commande |
+|------|---------|-------------|------------------------|
+| Préparé — en main, pointé | bleu | `_mh_stock_reel` (libre) | `_mh_prep_qty` |
+| Commandé au fournisseur — pas encore reçu | orange | `_rsmw_stock_ordered` (libre) | `_rsmw_prep_ordered` |
+| Manquant — ni l'un ni l'autre | vide | — | — |
+
+**Invariant par ligne : `préparé + commandé ≤ quantité`.** Il est tenu en un seul endroit,
+`Items::set_quantity()`, par où passe toute variation du préparé : à la hausse, la part commandée
+fond d'autant, ce qui évite de compter deux fois une unité qui vient d'arriver ; à la baisse elle
+reste intacte, un dépointage ne ressuscitant pas une commande fournisseur.
+
+Corollaire dans `Allocator::receive()` : seul le **résidu** (`reçu − converti`) est retiré du
+compteur libre, ce que les lignes ont déjà absorbé ne devant pas l'être une seconde fois.
+
+Une commande fournisseur **ne synchronise jamais le statut** : la marchandise n'est pas là, la
+commande ne peut donc pas devenir « À empaqueter ».
+
 ### Continuité des données
 
 Le module lit et écrit **exactement les mêmes clés** que le snippet — aucune migration.

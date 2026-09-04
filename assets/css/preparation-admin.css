@@ -26,6 +26,8 @@
 	--rsmw-positive: #00a32a;
 	--rsmw-negative: #b32d2e;
 	--rsmw-warning: #dba617;
+	/* Orange : commandé au fournisseur, pas encore reçu. */
+	--rsmw-ordered: #d98500;
 	--rsmw-pad: 16px 24px;
 
 	max-width: 1220px;
@@ -129,6 +131,7 @@
 
 .rsmw-segmented {
 	display: inline-flex;
+	flex-wrap: wrap;
 	background: var(--rsmw-canvas);
 	border-radius: var(--rsmw-radius-sm);
 	padding: 3px;
@@ -181,6 +184,16 @@
 
 .rsmw-segmented__input:checked + .rsmw-segmented__label--out {
 	color: var(--rsmw-negative);
+}
+
+.rsmw-segmented__input:checked + .rsmw-segmented__label--order,
+.rsmw-segmented__input:checked + .rsmw-segmented__label--unorder {
+	color: var(--rsmw-ordered);
+}
+
+.rsmw-direction-hint {
+	margin-top: 0;
+	margin-bottom: 18px;
 }
 
 /* Champs ----------------------------------------------------------------- */
@@ -279,6 +292,10 @@
 
 .rsmw-stats__value--ok {
 	color: var(--rsmw-positive);
+}
+
+.rsmw-stats__value--ordered {
+	color: var(--rsmw-ordered);
 }
 
 .rsmw-context__oldest {
@@ -445,6 +462,15 @@
 	font-weight: 600;
 }
 
+.rsmw-ordered {
+	color: var(--rsmw-ordered);
+	font-weight: 600;
+}
+
+.rsmw-kpi--ordered .rsmw-kpi__value {
+	color: var(--rsmw-ordered);
+}
+
 .rsmw-move-in {
 	color: var(--rsmw-positive);
 	font-weight: 600;
@@ -452,6 +478,11 @@
 
 .rsmw-move-out {
 	color: var(--rsmw-negative);
+	font-weight: 600;
+}
+
+.rsmw-move-order {
+	color: var(--rsmw-ordered);
 	font-weight: 600;
 }
 
@@ -500,6 +531,10 @@
 
 .rsmw-card--report-out {
 	box-shadow: 0 0 0 1px var(--rsmw-border), inset 4px 0 0 0 var(--rsmw-negative);
+}
+
+.rsmw-card--report-ordered {
+	box-shadow: 0 0 0 1px var(--rsmw-border), inset 4px 0 0 0 var(--rsmw-ordered);
 }
 
 .rsmw-card--dry {

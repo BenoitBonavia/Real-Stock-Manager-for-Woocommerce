@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.1
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,6 +44,16 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
 
+= 0.4.0 =
+* Suivi des commandes fournisseur : troisième état du stock, entre le manquant et le reçu.
+* Console de mouvement à quatre sens : Entrée, Commande fournisseur, Annulation, Retrait.
+* Attribution FIFO des quantités commandées sur les commandes clients les plus anciennes, sans effet sur le statut — une commande fournisseur ne rend jamais une commande « À empaqueter ».
+* Une nouvelle commande client se sert dans le commandé non encore attribué.
+* Barre de progression à deux segments, bleu pour le préparé et orange pour le commandé, sur la fiche commande et dans la liste des commandes.
+* Page « Besoins & stock » : colonnes « En commande » et « Reste à commander », qui déduit désormais ce qui est déjà commandé.
+* Champ « Commandé au fournisseur » sur les produits simples et sur chaque variation.
+* Journal des mouvements : filtre « Fournisseur » et colonne « En commande ».
+
 = 0.3.1 =
 * Refonte de la page « Gestion stock » en console de mouvement : un seul formulaire avec sélecteur Entrée/Retrait, au lieu de deux formulaires dupliqués.
 * Panneau de contexte : la sélection d'une référence affiche son stock libre, ce qu'il reste à préparer, le nombre de commandes en attente et la plus ancienne d'entre elles.
@@ -67,6 +77,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.4.0 =
+Nouveau suivi des commandes fournisseur. Aucune donnée existante n’est modifiée : les nouveaux compteurs démarrent à zéro, ce qui signifie « rien en commande ».
 
 = 0.3.1 =
 Refonte de l’interface de gestion du stock. Aucune donnée n’est modifiée, aucune action requise.

@@ -22,19 +22,27 @@
 	 * Affiche les champs propres au retrait selon le sens choisi.
 	 */
 	function initDirection() {
-		var outRadio = root.querySelector( '#rsmw-direction-out' );
 		var inputs = root.querySelectorAll( '[name="rsmw_movement_direction"]' );
 
-		if ( ! outRadio ) {
+		if ( ! inputs.length ) {
 			return;
 		}
 
 		function sync() {
-			var isOut = outRadio.checked;
+			var checked = root.querySelector( '[name="rsmw_movement_direction"]:checked' );
+			var current = checked ? checked.value : 'in';
 
-			root.querySelectorAll( '[data-rsmw-only="out"]' ).forEach( function ( element ) {
-				element.classList.toggle( 'rsmw-field--hidden', ! isOut );
-				element.hidden = ! isOut;
+			// Champs propres à un seul sens — le motif ne concerne que le retrait.
+			root.querySelectorAll( '[data-rsmw-only]' ).forEach( function ( element ) {
+				var visible = element.dataset.rsmwOnly === current;
+
+				element.classList.toggle( 'rsmw-field--hidden', ! visible );
+				element.hidden = ! visible;
+			} );
+
+			// Explication du sens sélectionné.
+			root.querySelectorAll( '[data-rsmw-hint]' ).forEach( function ( element ) {
+				element.hidden = element.dataset.rsmwHint !== current;
 			} );
 		}
 
@@ -135,6 +143,7 @@
 			stats.className = 'rsmw-stats';
 			stats.appendChild( statRow( label( 'free' ), data.free, data.free > 0 ? 'ok' : '' ) );
 			stats.appendChild( statRow( label( 'remaining' ), data.remaining, '' ) );
+			stats.appendChild( statRow( label( 'ordered' ), data.ordered, data.ordered > 0 ? 'ordered' : '' ) );
 			stats.appendChild( statRow( label( 'orders' ), data.orders, '' ) );
 
 			if ( data.missing > 0 ) {
@@ -205,7 +214,13 @@
 			var visible = 0;
 
 			rows.forEach( function ( row ) {
-				var matches = ( 'all' === current || row.dataset.rsmwType === current ) &&
+				var type = row.dataset.rsmwType;
+
+				// « Fournisseur » regroupe les commandes passées et leurs annulations.
+				var inFamily = ( 'all' === current ) ||
+					( 'supply' === current ? ( 'order' === type || 'unorder' === type ) : type === current );
+
+				var matches = inFamily &&
 					( ! query || row.dataset.rsmwSearch.indexOf( query ) !== -1 );
 
 				row.hidden = ! matches;

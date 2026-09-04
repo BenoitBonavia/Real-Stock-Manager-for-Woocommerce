@@ -54,6 +54,7 @@
 		var stockOnly = onlyStock.checked;
 		var visible = 0;
 		var remaining = 0;
+		var ordered = 0;
 		var missing = 0;
 		var value = 0;
 		var missingRefs = 0;
@@ -72,6 +73,7 @@
 
 			visible++;
 			remaining += parseInt( d.restant, 10 );
+			ordered += parseInt( d.commande, 10 ) || 0;
 			missing += parseInt( d.manque, 10 );
 			value += parseFloat( d.valeur );
 
@@ -82,6 +84,13 @@
 
 		document.getElementById( 'k-refs' ).textContent = visible;
 		document.getElementById( 'k-restant' ).textContent = remaining;
+
+		var orderedCell = document.getElementById( 'k-commande' );
+
+		if ( orderedCell ) {
+			orderedCell.textContent = ordered;
+		}
+
 		document.getElementById( 'k-manque' ).textContent = missing;
 		document.getElementById( 'k-refsmanque' ).textContent = missingRefs;
 		document.getElementById( 'k-valeur' ).textContent = formatCurrency( value );
@@ -129,7 +138,7 @@
 		event.preventDefault();
 
 		var lines = [
-			[ 'Reference', 'Demande', 'Deja pointe', 'Reste a preparer', 'Stock libre', 'Manque', 'Commandes' ]
+			[ 'Reference', 'Demande', 'Deja pointe', 'Reste a preparer', 'Stock libre', 'En commande', 'Reste a commander', 'Commandes' ]
 		];
 
 		rows.forEach( function ( row ) {
@@ -138,7 +147,7 @@
 			}
 
 			var d = row.dataset;
-			lines.push( [ d.name, d.demande, d.pointe, d.restant, d.libre, d.manque, d.commandes ] );
+			lines.push( [ d.name, d.demande, d.pointe, d.restant, d.libre, d.commande || 0, d.manque, d.commandes ] );
 		} );
 
 		var csv = lines.map( function ( line ) {

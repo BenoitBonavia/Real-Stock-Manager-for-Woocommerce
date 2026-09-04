@@ -73,14 +73,18 @@ final class Ajax {
 		$lines = array();
 
 		foreach ( $order->get_items() as $item_id => $item ) {
+			$quantity = (int) $item->get_quantity();
+			$prepared = min( $quantity, Items::prepared( $item ) );
+
 			$lines[] = array(
-				'item' => (int) $item_id,
-				'qty'  => min( (int) $item->get_quantity(), Items::prepared( $item ) ),
-				'free' => Stock::get( Items::key( $item ) ),
+				'item'    => (int) $item_id,
+				'qty'     => $prepared,
+				'ordered' => min( max( 0, $quantity - $prepared ), Items::ordered( $item ) ),
+				'free'    => Stock::get( Items::key( $item ) ),
 			);
 		}
 
-		list( $done, $total ) = Items::order_progress( $order );
+		list( $done, $ordered_total, $total ) = Items::order_coverage( $order );
 
 		$message = __( 'Enregistré.', 'real-stock-manager-for-woocommerce' );
 		$reload  = false;
@@ -97,14 +101,21 @@ final class Ajax {
 				);
 		}
 
+		$percent = $total > 0 ? (int) round( $done / $total * 100 ) : 0;
+
 		wp_send_json_success(
 			array(
-				'lines'   => $lines,
-				'done'    => $done,
-				'total'   => $total,
-				'pct'     => $total > 0 ? (int) round( $done / $total * 100 ) : 0,
-				'message' => $message,
-				'reload'  => $reload,
+				'lines'      => $lines,
+				'done'       => $done,
+				'ordered'    => $ordered_total,
+				'total'      => $total,
+				'pct'        => $percent,
+				// Borné à la place restante : les deux arrondis peuvent dépasser 100 %.
+				'orderedPct' => $total > 0
+					? min( max( 0, 100 - $percent ), (int) round( $ordered_total / $total * 100 ) )
+					: 0,
+				'message'    => $message,
+				'reload'     => $reload,
 			)
 		);
 	}

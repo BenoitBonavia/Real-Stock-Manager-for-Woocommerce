@@ -10,6 +10,7 @@ namespace RSMW\Preparation\Admin;
 use RSMW\Preparation\Demand;
 use RSMW\Preparation\Legacy;
 use RSMW\Preparation\Stock;
+use RSMW\Preparation\Supply;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -56,6 +57,27 @@ final class ProductFields {
 	}
 
 	/**
+	 * Phrase de contexte du champ « commandé au fournisseur ».
+	 *
+	 * @param int $product_id Produit ou variation.
+	 *
+	 * @return string
+	 */
+	private static function supply_hint( $product_id ): string {
+		$reserved = Demand::ordered_for( $product_id );
+
+		if ( $reserved > 0 ) {
+			return sprintf(
+				/* translators: %d: nombre d'articles déjà réservés sur des commandes. */
+				__( 'Commandé et pas encore reçu, hors des %d article(s) déjà réservés sur des commandes clients.', 'real-stock-manager-for-woocommerce' ),
+				$reserved
+			);
+		}
+
+		return __( 'Commandé au fournisseur et pas encore reçu. Passez plutôt par la page Gestion du stock : la saisie y est répartie automatiquement sur les commandes en attente.', 'real-stock-manager-for-woocommerce' );
+	}
+
+	/**
 	 * Champ des produits simples.
 	 */
 	public static function render_simple(): void {
@@ -79,6 +101,18 @@ final class ProductFields {
 			)
 		);
 
+		woocommerce_wp_text_input(
+			array(
+				'id'                => Supply::META,
+				'label'             => __( 'Commandé au fournisseur', 'real-stock-manager-for-woocommerce' ),
+				'type'              => 'number',
+				'value'             => Supply::get( $post->ID ),
+				'custom_attributes' => array( 'step' => '1' ),
+				'desc_tip'          => false,
+				'description'       => self::supply_hint( $post->ID ),
+			)
+		);
+
 		echo '</div>';
 	}
 
@@ -90,15 +124,27 @@ final class ProductFields {
 	 * @param int $post_id Produit.
 	 */
 	public static function save_simple( $post_id ): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié en amont par WC_Meta_Box_Product_Data.
-		if ( ! isset( $_POST[ Legacy::STOCK_META ] ) || ! current_user_can( 'edit_product', $post_id ) ) {
+		if ( ! current_user_can( 'edit_product', $post_id ) ) {
 			return;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- idem.
-		Stock::set( $post_id, (int) wp_unslash( $_POST[ Legacy::STOCK_META ] ) );
+		$changed = false;
 
-		Demand::flush();
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- vérifié en amont par WC_Meta_Box_Product_Data.
+		if ( isset( $_POST[ Legacy::STOCK_META ] ) ) {
+			Stock::set( $post_id, (int) wp_unslash( $_POST[ Legacy::STOCK_META ] ) );
+			$changed = true;
+		}
+
+		if ( isset( $_POST[ Supply::META ] ) ) {
+			Supply::set( $post_id, (int) wp_unslash( $_POST[ Supply::META ] ) );
+			$changed = true;
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		if ( $changed ) {
+			Demand::flush();
+		}
 	}
 
 	/**
@@ -124,6 +170,20 @@ final class ProductFields {
 				'description'       => self::hint( $variation->ID ),
 			)
 		);
+
+		woocommerce_wp_text_input(
+			array(
+				'id'                => 'rsmw_stock_ordered_' . $loop,
+				'name'              => 'rsmw_stock_ordered[' . $loop . ']',
+				'label'             => __( 'Commandé au fournisseur', 'real-stock-manager-for-woocommerce' ),
+				'type'              => 'number',
+				'value'             => Supply::get( $variation->ID ),
+				'custom_attributes' => array( 'step' => '1' ),
+				'wrapper_class'     => 'form-row form-row-full',
+				'desc_tip'          => false,
+				'description'       => self::supply_hint( $variation->ID ),
+			)
+		);
 	}
 
 	/**
@@ -133,15 +193,27 @@ final class ProductFields {
 	 * @param int $loop         Index de la variation dans le formulaire.
 	 */
 	public static function save_variation( $variation_id, $loop ): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié en amont par WC_AJAX::save_variations().
-		if ( ! isset( $_POST['mh_stock_reel'][ $loop ] ) || ! current_user_can( 'edit_product', $variation_id ) ) {
+		if ( ! current_user_can( 'edit_product', $variation_id ) ) {
 			return;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- idem.
-		Stock::set( $variation_id, (int) wp_unslash( $_POST['mh_stock_reel'][ $loop ] ) );
+		$changed = false;
 
-		Demand::flush();
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- vérifié en amont par WC_AJAX::save_variations().
+		if ( isset( $_POST['mh_stock_reel'][ $loop ] ) ) {
+			Stock::set( $variation_id, (int) wp_unslash( $_POST['mh_stock_reel'][ $loop ] ) );
+			$changed = true;
+		}
+
+		if ( isset( $_POST['rsmw_stock_ordered'][ $loop ] ) ) {
+			Supply::set( $variation_id, (int) wp_unslash( $_POST['rsmw_stock_ordered'][ $loop ] ) );
+			$changed = true;
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		if ( $changed ) {
+			Demand::flush();
+		}
 	}
 
 	/**

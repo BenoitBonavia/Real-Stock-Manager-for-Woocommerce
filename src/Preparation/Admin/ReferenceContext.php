@@ -10,6 +10,7 @@ namespace RSMW\Preparation\Admin;
 use RSMW\Preparation\Demand;
 use RSMW\Preparation\Labels;
 use RSMW\Preparation\Stock;
+use RSMW\Preparation\Supply;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -88,13 +89,24 @@ final class ReferenceContext {
 		$free      = Stock::get( $product_id );
 		$remaining = (int) $data['restant'];
 
+		/*
+		 * Commandé au fournisseur pour cette référence : la part déjà réservée sur
+		 * des commandes clients, plus le reliquat non encore attribué. Lecture
+		 * défensive de la carte : un transient écrit par une version antérieure ne
+		 * porte pas encore cette clé.
+		 */
+		$ordered = ( isset( $data['commande'] ) ? (int) $data['commande'] : 0 )
+			+ Supply::get( $product_id );
+
 		return array(
 			'label'     => trim( $info['name'] . ( '' !== $info['variant'] ? ' — ' . $info['variant'] : '' ) ),
 			'sku'       => $info['sku'],
 			'free'      => $free,
 			'remaining' => $remaining,
+			'ordered'   => $ordered,
 			'orders'    => (int) $data['commandes'],
-			'missing'   => max( 0, $remaining - max( 0, $free ) ),
+			// Ce qu'il reste réellement à commander : ni en stock, ni déjà commandé.
+			'missing'   => max( 0, $remaining - max( 0, $free ) - $ordered ),
 			'oldest'    => self::oldest( $data['plus_vieux'] ),
 		);
 	}

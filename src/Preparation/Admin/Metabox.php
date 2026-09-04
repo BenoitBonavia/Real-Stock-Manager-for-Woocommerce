@@ -109,7 +109,7 @@ final class Metabox {
 			return;
 		}
 
-		list( $done, $total ) = Items::order_progress( $order );
+		list( $done, $ordered_total, $total ) = Items::order_coverage( $order );
 
 		$items = $order->get_items();
 
@@ -121,26 +121,35 @@ final class Metabox {
 			$key      = Items::key( $item );
 			$quantity = (int) $item->get_quantity();
 			$info     = Labels::get( $key );
+			$prepared = min( $quantity, Items::prepared( $item ) );
 
 			$lines[] = array(
 				'id'       => (int) $item_id,
 				'name'     => $info['name'],
 				'variant'  => $info['variant'],
 				'quantity' => $quantity,
-				'prepared' => min( $quantity, Items::prepared( $item ) ),
+				'prepared' => $prepared,
+				'ordered'  => min( max( 0, $quantity - $prepared ), Items::ordered( $item ) ),
 				'free'     => Stock::get( $key ),
 			);
 		}
 
+		$percent = $total > 0 ? (int) round( $done / $total * 100 ) : 0;
+
 		View::render(
 			'metabox',
 			array(
-				'order_id' => $order->get_id(),
-				'nonce'    => wp_create_nonce( Legacy::AJAX_NONCE ),
-				'done'     => $done,
-				'total'    => $total,
-				'percent'  => $total > 0 ? (int) round( $done / $total * 100 ) : 0,
-				'lines'    => $lines,
+				'order_id'        => $order->get_id(),
+				'nonce'           => wp_create_nonce( Legacy::AJAX_NONCE ),
+				'done'            => $done,
+				'ordered'         => $ordered_total,
+				'total'           => $total,
+				'percent'         => $percent,
+				// Borné à la place restante : les deux arrondis peuvent dépasser 100 %.
+				'ordered_percent' => $total > 0
+					? min( max( 0, 100 - $percent ), (int) round( $ordered_total / $total * 100 ) )
+					: 0,
+				'lines'           => $lines,
 			)
 		);
 	}

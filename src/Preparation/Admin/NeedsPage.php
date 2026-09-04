@@ -14,6 +14,7 @@ use RSMW\Preparation\Labels;
 use RSMW\Preparation\Legacy;
 use RSMW\Preparation\OrderStatus;
 use RSMW\Preparation\Stock;
+use RSMW\Preparation\Supply;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -47,10 +48,11 @@ final class NeedsPage {
 
 		$rows   = array();
 		$totals = array(
-			'restant'      => 0,
-			'manque'       => 0,
-			'valeur'       => 0.0,
-			'refs_manque'  => 0,
+			'restant'     => 0,
+			'commande'    => 0,
+			'manque'      => 0,
+			'valeur'      => 0.0,
+			'refs_manque' => 0,
 		);
 
 		foreach ( $map as $product_id => $data ) {
@@ -58,7 +60,17 @@ final class NeedsPage {
 			$info      = Labels::get( $product_id );
 			$free      = Stock::get( $product_id );
 			$remaining = (int) $data['restant'];
-			$missing   = max( 0, $remaining - max( 0, $free ) );
+
+			/*
+			 * Commandé au fournisseur : la part déjà réservée sur des commandes
+			 * clients, plus le reliquat non attribué. Lecture défensive de la carte,
+			 * un transient d'une version antérieure ne porte pas encore cette clé.
+			 */
+			$ordered = ( isset( $data['commande'] ) ? (int) $data['commande'] : 0 )
+				+ Supply::get( $product_id );
+
+			// Ce qu'il reste RÉELLEMENT à commander : ni en stock, ni déjà commandé.
+			$missing = max( 0, $remaining - max( 0, $free ) - $ordered );
 
 			$rows[] = array(
 				'id'        => (int) $product_id,
@@ -69,15 +81,17 @@ final class NeedsPage {
 				'pointe'    => (int) $data['pointe'],
 				'restant'   => $remaining,
 				'libre'     => $free,
+				'commande'  => $ordered,
 				'manque'    => $missing,
 				'commandes' => (int) $data['commandes'],
 				'oldest'    => self::oldest_order( $data['plus_vieux'] ),
 				'valeur'    => $missing * $info['price'],
 			);
 
-			$totals['restant'] += $remaining;
-			$totals['manque']  += $missing;
-			$totals['valeur']  += $missing * $info['price'];
+			$totals['restant']  += $remaining;
+			$totals['commande'] += $ordered;
+			$totals['manque']   += $missing;
+			$totals['valeur']   += $missing * $info['price'];
 
 			if ( $missing > 0 ) {
 				++$totals['refs_manque'];

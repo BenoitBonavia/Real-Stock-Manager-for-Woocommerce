@@ -151,14 +151,15 @@ final class Demand {
 			        MAX( CASE WHEN m.meta_key = '_product_id'   THEN m.meta_value END ) AS pid,
 			        MAX( CASE WHEN m.meta_key = '_variation_id' THEN m.meta_value END ) AS vid,
 			        MAX( CASE WHEN m.meta_key = '_qty'          THEN m.meta_value END ) AS qty,
-			        MAX( CASE WHEN m.meta_key = %s              THEN m.meta_value END ) AS prep
+			        MAX( CASE WHEN m.meta_key = %s              THEN m.meta_value END ) AS prep,
+			        MAX( CASE WHEN m.meta_key = %s              THEN m.meta_value END ) AS ord
 			   FROM {$wpdb->prefix}woocommerce_order_items          AS oi
 			   INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta AS m
 			           ON m.order_item_id = oi.order_item_id
 			  WHERE oi.order_item_type = 'line_item'
 			    AND oi.order_id IN ( {$placeholders} )
 			  GROUP BY oi.order_item_id",
-			array_merge( array( Legacy::ITEM_QTY_META ), $order_ids )
+			array_merge( array( Legacy::ITEM_QTY_META, Supply::ITEM_META ), $order_ids )
 		);
 
 		$rows = $wpdb->get_results( $sql );
@@ -176,19 +177,25 @@ final class Demand {
 			$prepared = max( 0, min( $quantity, (int) $row->prep ) );
 			$order_id = (int) $row->order_id;
 
+			// Borné par ce qui reste à couvrir : préparé + commandé ne peut
+			// dépasser la quantité voulue par le client.
+			$ordered = max( 0, min( $quantity - $prepared, (int) $row->ord ) );
+
 			if ( ! isset( $map[ $key ] ) ) {
 				$map[ $key ] = array(
 					'demande'    => 0,
 					'pointe'     => 0,
 					'restant'    => 0,
+					'commande'   => 0,
 					'commandes'  => array(),
 					'plus_vieux' => null,
 				);
 			}
 
-			$map[ $key ]['demande'] += $quantity;
-			$map[ $key ]['pointe']  += $prepared;
-			$map[ $key ]['restant'] += max( 0, $quantity - $prepared );
+			$map[ $key ]['demande']  += $quantity;
+			$map[ $key ]['pointe']   += $prepared;
+			$map[ $key ]['restant']  += max( 0, $quantity - $prepared );
+			$map[ $key ]['commande'] += $ordered;
 
 			if ( $quantity - $prepared > 0 ) {
 				$map[ $key ]['commandes'][ $order_id ] = true;
@@ -221,6 +228,22 @@ final class Demand {
 		$map = self::map();
 
 		return isset( $map[ (int) $product_id ]['restant'] ) ? (int) $map[ (int) $product_id ]['restant'] : 0;
+	}
+
+	/**
+	 * Quantité déjà couverte par une commande fournisseur, pour une référence.
+	 *
+	 * La lecture est défensive : un transient écrit par une version antérieure du
+	 * plugin ne contient pas encore cette clé, et vit jusqu'à son expiration.
+	 *
+	 * @param int $product_id Produit ou variation.
+	 *
+	 * @return int
+	 */
+	public static function ordered_for( $product_id ): int {
+		$map = self::map();
+
+		return isset( $map[ (int) $product_id ]['commande'] ) ? (int) $map[ (int) $product_id ]['commande'] : 0;
 	}
 
 	/**

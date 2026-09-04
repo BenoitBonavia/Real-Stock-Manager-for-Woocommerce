@@ -11,6 +11,8 @@ use RSMW\Preparation\Allocator;
 use RSMW\Preparation\Journal;
 use RSMW\Preparation\Labels;
 use RSMW\Preparation\Legacy;
+use RSMW\Preparation\Stock;
+use RSMW\Preparation\Supply;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -26,8 +28,14 @@ final class StockPage {
 	/** Nonce du formulaire de mouvement. */
 	private const NONCE = 'rsmw_stock_movement';
 
-	/** Sens autorisés. */
-	private const DIRECTIONS = array( 'in', 'out' );
+	/**
+	 * Sens autorisés.
+	 *
+	 * `in` / `out` déplacent du stock physique ; `order` / `unorder` déplacent des
+	 * quantités commandées au fournisseur, sans marchandise et sans effet sur le
+	 * statut des commandes.
+	 */
+	private const DIRECTIONS = array( 'in', 'order', 'unorder', 'out' );
 
 	/**
 	 * Affiche la page.
@@ -112,26 +120,45 @@ final class StockPage {
 			? sanitize_text_field( wp_unslash( $_POST['rsmw_movement_reason'] ) )
 			: '';
 
-		if ( 'in' === $direction ) {
-			$report   = Allocator::receive( $product_id, $quantity );
-			$moved    = $quantity;
-			$affected = (int) $report['affecte'];
-		} else {
-			$report   = Allocator::withdraw( $product_id, $quantity, $reason );
-			$moved    = (int) $report['du_libre'] + (int) $report['repris'];
-			$affected = (int) $report['repris'];
+		switch ( $direction ) {
+			case 'in':
+				$report   = Allocator::receive( $product_id, $quantity );
+				$moved    = $quantity;
+				$affected = (int) $report['affecte'];
+				break;
+
+			case 'order':
+				$report   = Allocator::order_from_supplier( $product_id, $quantity );
+				$moved    = $quantity;
+				$affected = (int) $report['affecte'];
+				break;
+
+			case 'unorder':
+				$report   = Allocator::cancel_supplier_order( $product_id, $quantity );
+				$moved    = (int) $report['du_libre'] + (int) $report['repris'];
+				$affected = (int) $report['repris'];
+				break;
+
+			default:
+				$report   = Allocator::withdraw( $product_id, $quantity, $reason );
+				$moved    = (int) $report['du_libre'] + (int) $report['repris'];
+				$affected = (int) $report['repris'];
+				break;
 		}
 
 		Journal::add(
 			array(
-				'time'   => time(),
-				'user'   => wp_get_current_user()->display_name,
-				'type'   => 'in' === $direction ? 'in' : 'out',
-				'label'  => self::reference_label( $product_id ),
-				'qty'    => $moved,
-				'orders' => $affected,
-				'libre'  => (int) $report['libre'],
-				'motif'  => $reason,
+				'time'     => time(),
+				'user'     => wp_get_current_user()->display_name,
+				'type'     => $direction,
+				'label'    => self::reference_label( $product_id ),
+				'qty'      => $moved,
+				'orders'   => $affected,
+				// Les deux compteurs sont relevés après coup, quel que soit le
+				// sens : le journal doit rester lisible d'une ligne à l'autre.
+				'libre'    => Stock::get( $product_id ),
+				'commande' => Supply::get( $product_id ),
+				'motif'    => $reason,
 			)
 		);
 

@@ -86,24 +86,53 @@ final class OrdersColumn {
 			return;
 		}
 
-		list( $done, $total ) = Items::order_progress( $order );
+		list( $prepared, $ordered, $total ) = Items::order_coverage( $order );
 
-		$percent = $total > 0 ? (int) round( $done / $total * 100 ) : 0;
+		$prepared_pct = $total > 0 ? (int) round( $prepared / $total * 100 ) : 0;
+		$ordered_pct  = $total > 0 ? (int) round( $ordered / $total * 100 ) : 0;
 
-		if ( 100 === $percent ) {
+		// Les deux arrondis peuvent dépasser 100 % à eux deux : on borne le second
+		// à la place réellement restante.
+		$ordered_pct = min( max( 0, 100 - $prepared_pct ), $ordered_pct );
+
+		if ( $total > 0 && $prepared >= $total ) {
 			$modifier = 'rsmw-prep-progress--complete';
-		} elseif ( $done > 0 ) {
+		} elseif ( $prepared > 0 ) {
 			$modifier = 'rsmw-prep-progress--partial';
 		} else {
 			$modifier = '';
 		}
 
+		$label = sprintf( '%d/%d', (int) $prepared, (int) $total );
+
+		if ( $ordered > 0 ) {
+			$label .= sprintf(
+				' <span class="rsmw-prep-progress__ordered">+%d</span>',
+				(int) $ordered
+			);
+		}
+
 		printf(
-			'<span class="rsmw-prep-progress %1$s"><span class="rsmw-prep-progress__track"><span class="rsmw-prep-progress__fill" style="width:%2$d%%"></span></span><span class="rsmw-prep-progress__label">%3$d/%4$d</span></span>',
+			'<span class="rsmw-prep-progress %1$s" title="%2$s">'
+				. '<span class="rsmw-prep-progress__track">'
+					. '<span class="rsmw-prep-progress__fill" style="width:%3$d%%"></span>'
+					. '<span class="rsmw-prep-progress__fill--ordered" style="width:%4$d%%"></span>'
+				. '</span>'
+				. '<span class="rsmw-prep-progress__label">%5$s</span>'
+			. '</span>',
 			esc_attr( $modifier ),
-			(int) $percent,
-			(int) $done,
-			(int) $total
+			esc_attr(
+				sprintf(
+					/* translators: 1: quantité préparée, 2: quantité commandée au fournisseur, 3: total. */
+					__( '%1$d préparé(s), %2$d en commande fournisseur, sur %3$d', 'real-stock-manager-for-woocommerce' ),
+					(int) $prepared,
+					(int) $ordered,
+					(int) $total
+				)
+			),
+			(int) $prepared_pct,
+			(int) $ordered_pct,
+			wp_kses_post( $label )
 		);
 	}
 

@@ -65,8 +65,9 @@ function rsmw_uninstall_delete_options(): void {
 
 	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- désinstallation ponctuelle.
 	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_mh_stock_reel' ) );
+	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_rsmw_stock_ordered' ) );
 
-	foreach ( array( '_mh_prep_qty', '_mh_prep_from_stock', '_mh_prep_date', '_mh_prep_user' ) as $item_meta_key ) {
+	foreach ( array( '_mh_prep_qty', '_mh_prep_from_stock', '_mh_prep_date', '_mh_prep_user', '_rsmw_prep_ordered' ) as $item_meta_key ) {
 		$wpdb->delete( $wpdb->prefix . 'woocommerce_order_itemmeta', array( 'meta_key' => $item_meta_key ) );
 	}
 	// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching

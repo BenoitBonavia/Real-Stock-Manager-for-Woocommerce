@@ -199,12 +199,16 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 			<div class="rsmw-kpi__label"><?php esc_html_e( 'Articles à préparer', 'real-stock-manager-for-woocommerce' ); ?></div>
 			<div class="rsmw-kpi__value" id="k-restant"><?php echo esc_html( (string) (int) $rsmw_totals['restant'] ); ?></div>
 		</div>
+		<div class="rsmw-kpi rsmw-kpi--ordered">
+			<div class="rsmw-kpi__label"><?php esc_html_e( 'En commande', 'real-stock-manager-for-woocommerce' ); ?></div>
+			<div class="rsmw-kpi__value" id="k-commande"><?php echo esc_html( (string) (int) $rsmw_totals['commande'] ); ?></div>
+		</div>
 		<div class="rsmw-kpi rsmw-kpi--alert">
-			<div class="rsmw-kpi__label"><?php esc_html_e( 'Manquants', 'real-stock-manager-for-woocommerce' ); ?></div>
+			<div class="rsmw-kpi__label"><?php esc_html_e( 'Reste à commander', 'real-stock-manager-for-woocommerce' ); ?></div>
 			<div class="rsmw-kpi__value" id="k-manque"><?php echo esc_html( (string) (int) $rsmw_totals['manque'] ); ?></div>
 		</div>
 		<div class="rsmw-kpi rsmw-kpi--alert">
-			<div class="rsmw-kpi__label"><?php esc_html_e( 'Références en manque', 'real-stock-manager-for-woocommerce' ); ?></div>
+			<div class="rsmw-kpi__label"><?php esc_html_e( 'Références à commander', 'real-stock-manager-for-woocommerce' ); ?></div>
 			<div class="rsmw-kpi__value" id="k-refsmanque"><?php echo esc_html( (string) (int) $rsmw_totals['refs_manque'] ); ?></div>
 		</div>
 		<div class="rsmw-kpi">
@@ -294,7 +298,8 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 							<th class="rsmw-num" data-key="pointe"><?php esc_html_e( 'Déjà pointé', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<th class="rsmw-num" data-key="restant"><?php esc_html_e( 'Reste à préparer', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<th class="rsmw-num" data-key="libre"><?php esc_html_e( 'Stock libre', 'real-stock-manager-for-woocommerce' ); ?></th>
-							<th class="rsmw-num" data-key="manque"><?php esc_html_e( 'Manque', 'real-stock-manager-for-woocommerce' ); ?></th>
+							<th class="rsmw-num" data-key="commande"><?php esc_html_e( 'En commande', 'real-stock-manager-for-woocommerce' ); ?></th>
+							<th class="rsmw-num" data-key="manque"><?php esc_html_e( 'Reste à commander', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<th class="rsmw-num" data-key="commandes"><?php esc_html_e( 'Commandes', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<th><?php esc_html_e( 'Plus ancienne', 'real-stock-manager-for-woocommerce' ); ?></th>
 						</tr>
@@ -313,6 +318,7 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 							data-pointe="<?php echo esc_attr( (string) $rsmw_row['pointe'] ); ?>"
 							data-restant="<?php echo esc_attr( (string) $rsmw_row['restant'] ); ?>"
 							data-libre="<?php echo esc_attr( (string) $rsmw_row['libre'] ); ?>"
+							data-commande="<?php echo esc_attr( (string) $rsmw_row['commande'] ); ?>"
 							data-manque="<?php echo esc_attr( (string) $rsmw_row['manque'] ); ?>"
 							data-commandes="<?php echo esc_attr( (string) $rsmw_row['commandes'] ); ?>"
 							data-valeur="<?php echo esc_attr( (string) $rsmw_row['valeur'] ); ?>">
@@ -336,6 +342,9 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 							</td>
 							<td class="rsmw-num <?php echo $rsmw_row['libre'] < 0 ? 'rsmw-lack' : ''; ?>">
 								<?php echo 0 === $rsmw_row['libre'] ? '<span class="rsmw-zero">·</span>' : esc_html( (string) $rsmw_row['libre'] ); ?>
+							</td>
+							<td class="rsmw-num <?php echo $rsmw_row['commande'] > 0 ? 'rsmw-ordered' : ''; ?>">
+								<?php echo $rsmw_row['commande'] > 0 ? esc_html( (string) $rsmw_row['commande'] ) : '<span class="rsmw-zero">·</span>'; ?>
 							</td>
 							<td class="rsmw-num <?php echo $rsmw_row['manque'] > 0 ? 'rsmw-lack' : 'rsmw-full'; ?>">
 								<?php echo $rsmw_row['manque'] > 0 ? esc_html( (string) $rsmw_row['manque'] ) : '✓'; ?>

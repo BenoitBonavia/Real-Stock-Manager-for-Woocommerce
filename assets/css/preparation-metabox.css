@@ -9,12 +9,17 @@
 	margin-bottom: 12px;
 }
 
+/*
+ * Deux segments côte à côte : le préparé, puis le commandé au fournisseur.
+ * Le reste de la piste est ce qui manque encore.
+ */
 #mh-prep-box-inner .mh-bar {
 	flex: 1;
 	height: 8px;
 	border-radius: 99px;
 	background: #e6e6ec;
 	overflow: hidden;
+	display: flex;
 }
 
 #mh-prep-box-inner .mh-bar span {
@@ -22,6 +27,30 @@
 	height: 100%;
 	background: #6d4aff;
 	transition: width .25s;
+	flex: none;
+}
+
+/* Sélecteur volontairement plus spécifique que la règle générique ci-dessus,
+   qui gagnerait sinon sur la simple classe. */
+#mh-prep-box-inner .mh-bar span.mh-bar__ordered {
+	background: #d98500;
+}
+
+#mh-prep-box-inner .mh-ordered-badge {
+	color: #d98500;
+	font-weight: 600;
+	margin-left: 6px;
+}
+
+#mh-prep-box-inner .mh-ordered {
+	color: #d98500;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+#mh-prep-box-inner .mh-ordered.is-empty {
+	color: #c3c4c7;
+	font-weight: 400;
 }
 
 #mh-prep-box-inner .mh-count {

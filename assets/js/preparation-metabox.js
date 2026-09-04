@@ -40,10 +40,31 @@
 			var free = row.querySelector( '.mh-free' );
 			free.textContent = line.free;
 			free.classList.toggle( 'neg', line.free < 0 );
+
+			var ordered = row.querySelector( '.mh-ordered' );
+
+			if ( ordered ) {
+				ordered.textContent = line.ordered > 0 ? line.ordered : '·';
+				ordered.classList.toggle( 'is-empty', ! ( line.ordered > 0 ) );
+			}
 		} );
 
 		document.getElementById( 'mh-prep-done' ).textContent = data.done;
 		document.getElementById( 'mh-prep-fill' ).style.width = data.pct + '%';
+
+		var orderedFill = document.getElementById( 'mh-prep-fill-ordered' );
+
+		if ( orderedFill ) {
+			orderedFill.style.width = data.orderedPct + '%';
+		}
+
+		var orderedBadge = document.getElementById( 'mh-prep-ordered' );
+
+		if ( orderedBadge ) {
+			orderedBadge.textContent = text( 'ordered' ).replace( '%d', data.ordered );
+			orderedBadge.hidden = ! ( data.ordered > 0 );
+		}
+
 		msg.textContent = data.message;
 
 		if ( data.reload ) {

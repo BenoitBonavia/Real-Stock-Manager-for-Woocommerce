@@ -17,19 +17,37 @@ mark.mh-empaqueter {
 	gap: 7px;
 }
 
+/*
+ * Piste en flex : deux segments côte à côte, le préparé puis le commandé au
+ * fournisseur. Ce qui reste est vide — c'est le manquant.
+ */
 .rsmw-prep-progress__track {
 	width: 52px;
 	height: 6px;
 	border-radius: 99px;
 	background: #e6e6ec;
 	overflow: hidden;
-	display: inline-block;
+	display: inline-flex;
 }
 
 .rsmw-prep-progress__fill {
 	display: block;
 	height: 100%;
 	background: #dcdcde;
+	flex: none;
+}
+
+/* Orange : couvert, mais pas encore reçu. */
+.rsmw-prep-progress__fill--ordered {
+	display: block;
+	height: 100%;
+	background: #d98500;
+	flex: none;
+}
+
+.rsmw-prep-progress__ordered {
+	color: #d98500;
+	font-weight: 600;
 }
 
 .rsmw-prep-progress--partial .rsmw-prep-progress__fill {

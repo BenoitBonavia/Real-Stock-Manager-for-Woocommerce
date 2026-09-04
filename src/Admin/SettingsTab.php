@@ -15,6 +15,7 @@ use RSMW\Preparation\Journal;
 use RSMW\Preparation\OrderStatus;
 use RSMW\Preparation\SnippetGuard;
 use RSMW\Preparation\Stock;
+use RSMW\Preparation\Supply;
 use RSMW\Support\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -237,6 +238,13 @@ final class SettingsTab extends \WC_Settings_Page {
 			'<strong>' . esc_html( number_format_i18n( Stock::tracked_reference_count() ) ) . '</strong>',
 			'<strong>' . esc_html( number_format_i18n( Items::prepared_line_count() ) ) . '</strong>',
 			'<strong>' . esc_html( number_format_i18n( Journal::count() ) ) . '</strong>'
+		);
+
+		$lines[] = sprintf(
+			/* translators: 1: nombre de références, 2: nombre de lignes. */
+			esc_html__( 'Commandes fournisseur — références avec une commande en cours : %1$s · lignes de commande couvertes : %2$s', 'real-stock-manager-for-woocommerce' ),
+			'<strong>' . esc_html( number_format_i18n( Supply::tracked_reference_count() ) ) . '</strong>',
+			'<strong>' . esc_html( number_format_i18n( Items::ordered_line_count() ) ) . '</strong>'
 		);
 
 		$statuses = Config::statuses();
