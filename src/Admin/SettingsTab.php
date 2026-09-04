@@ -9,6 +9,7 @@ namespace RSMW\Admin;
 
 use RSMW\Modules\ModuleInterface;
 use RSMW\Plugin;
+use RSMW\PreOrder\Config as PreOrderConfig;
 use RSMW\PreOrder\Legacy as PreOrderLegacy;
 use RSMW\PreOrder\Migration as PreOrderMigration;
 use RSMW\PreOrder\OrderStatus as PreOrderStatus;
@@ -52,6 +53,7 @@ final class SettingsTab extends \WC_Settings_Page {
 		return array(
 			''            => __( 'Général', 'real-stock-manager-for-woocommerce' ),
 			'preparation' => __( 'Préparation', 'real-stock-manager-for-woocommerce' ),
+			'preorders'   => __( 'Précommandes', 'real-stock-manager-for-woocommerce' ),
 			'modules'     => __( 'Modules', 'real-stock-manager-for-woocommerce' ),
 		);
 	}
@@ -182,6 +184,52 @@ final class SettingsTab extends \WC_Settings_Page {
 	}
 
 	/**
+	 * Champs de la section « Précommandes ».
+	 *
+	 * @return array
+	 */
+	protected function get_settings_for_preorders_section(): array {
+		$tracked = PreOrderConfig::status_is_tracked();
+
+		/*
+		 * La description change selon que le statut est suivi ou non. C'est le
+		 * seul endroit où le marchand peut comprendre pourquoi la case cochée ne
+		 * produit rien : la dépendance entre les deux réglages n'a aucune raison
+		 * d'être devinable.
+		 */
+		$description = __( 'Placer la commande dans le statut « Précommande » dès qu’elle entre dans le périmètre de préparation. Une seule fois : sortir ensuite la commande de ce statut à la main reste possible, elle n’y retombera pas.', 'real-stock-manager-for-woocommerce' );
+
+		if ( ! $tracked ) {
+			$description .= '<br><strong style="color:#b32d2e">' . sprintf(
+				/* translators: %s: slug du statut de précommande. */
+				esc_html__( 'Sans effet pour l’instant : %s ne figure pas dans les « Statuts à préparer » de l’onglet Préparation. Tant que c’est le cas, la bascule reste suspendue — elle sortirait sinon chaque précommande du circuit : absente de « Besoins & stock », jamais servie par l’entrée de stock, et jamais ramenée en « À empaqueter ».', 'real-stock-manager-for-woocommerce' ),
+				'<code>' . esc_html( PreOrderLegacy::STATUS_SLUG ) . '</code>'
+			) . '</strong>';
+		}
+
+		return array(
+			array(
+				'title' => __( 'Précommandes', 'real-stock-manager-for-woocommerce' ),
+				'type'  => 'title',
+				'desc'  => __( 'Le marquage des précommandes ne dépend d’aucun réglage : il est posé à l’achat, sur la ligne de commande, et ne s’efface jamais. Ce qui suit ne concerne que le statut de commande.', 'real-stock-manager-for-woocommerce' ),
+				'id'    => Settings::PREFIX . 'preorder_options',
+			),
+			array(
+				'title'    => __( 'Statut automatique', 'real-stock-manager-for-woocommerce' ),
+				'desc'     => $description,
+				'id'       => Settings::PREFIX . PreOrderConfig::KEY_AUTO_STATUS,
+				'type'     => 'checkbox',
+				'default'  => 'no',
+				'desc_tip' => false,
+			),
+			array(
+				'type' => 'sectionend',
+				'id'   => Settings::PREFIX . 'preorder_options',
+			),
+		);
+	}
+
+	/**
 	 * Complète la description d'un champ imposé par une constante.
 	 *
 	 * Le champ reste modifiable : le désactiver ferait enregistrer une valeur vide
@@ -286,13 +334,21 @@ final class SettingsTab extends \WC_Settings_Page {
 		 * la commande a juste l'air d'aller bien. D'où cet avertissement, qui ne
 		 * se déclenche que si des commandes portent effectivement le statut.
 		 */
-		if ( PreOrderStatus::order_count() > 0 && ! in_array( PreOrderLegacy::STATUS_SLUG, Config::statuses(), true ) ) {
+		if ( ! PreOrderConfig::status_is_tracked() && ( PreOrderStatus::order_count() > 0 || PreOrderConfig::auto_status() ) ) {
 			$lines[] = '<strong style="color:#b32d2e">' . sprintf(
 				/* translators: %s: slug du statut de précommande. */
-				esc_html__( 'Des commandes portent le statut « Précommande », qui ne figure pas dans les statuts suivis ci-dessous : elles sont hors du circuit de préparation — absentes de « Besoins & stock », et l’entrée de stock ne leur attribue rien. Ajoutez %s aux statuts suivis, ou ne vous servez pas de ce statut : le marquage des précommandes n’en dépend pas.', 'real-stock-manager-for-woocommerce' ),
+				esc_html__( 'Le statut « Précommande » ne figure pas dans les statuts suivis ci-dessous. Une commande qu’on y place sort du circuit de préparation : absente de « Besoins & stock », jamais servie par l’entrée de stock, et jamais ramenée en « À empaqueter ». Ajoutez %s aux statuts suivis, ou ne vous servez pas de ce statut — le marquage des précommandes n’en dépend pas.', 'real-stock-manager-for-woocommerce' ),
 				'<code>' . esc_html( PreOrderLegacy::STATUS_SLUG ) . '</code>'
 			) . '</strong>';
 		}
+
+		$lines[] = sprintf(
+			/* translators: 1: oui/non, 2: oui/non, 3: oui/non. */
+			esc_html__( 'Bascule automatique vers « Précommande » — demandée : %1$s · statut suivi : %2$s · effective : %3$s', 'real-stock-manager-for-woocommerce' ),
+			$this->yes_no( PreOrderConfig::auto_status() ),
+			$this->yes_no( PreOrderConfig::status_is_tracked() ),
+			$this->yes_no( PreOrderConfig::auto_status_is_operative() )
+		);
 
 		$statuses = Config::statuses();
 

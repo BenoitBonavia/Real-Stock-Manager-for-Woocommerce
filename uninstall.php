@@ -70,6 +70,33 @@ function rsmw_uninstall_delete_options(): void {
 
 	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_mh_preorder_date' ) );
 
+	/*
+	 * Métas de COMMANDE. Elles ne vivent dans postmeta qu'en stockage historique :
+	 * sous HPOS elles sont dans wc_orders_meta, et supprimer les unes sans les
+	 * autres laisserait la moitié des traces en base. On balaie les deux tables,
+	 * en vérifiant l'existence de la seconde — une boutique n'ayant jamais activé
+	 * HPOS ne l'a pas.
+	 */
+	$order_meta_keys = array(
+		'_rsmw_has_preorder',
+		'_rsmw_preorder_date_max',
+		'_rsmw_preorder_status_applied',
+		'_mh_prep_prev_status',
+	);
+
+	$order_meta_tables = array( $wpdb->postmeta );
+	$hpos_meta_table   = $wpdb->prefix . 'wc_orders_meta';
+
+	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $hpos_meta_table ) ) === $hpos_meta_table ) {
+		$order_meta_tables[] = $hpos_meta_table;
+	}
+
+	foreach ( $order_meta_tables as $order_meta_table ) {
+		foreach ( $order_meta_keys as $order_meta_key ) {
+			$wpdb->delete( $order_meta_table, array( 'meta_key' => $order_meta_key ) );
+		}
+	}
+
 	$item_meta_keys = array(
 		'_mh_prep_qty',
 		'_mh_prep_from_stock',
@@ -91,7 +118,14 @@ function rsmw_uninstall_delete_options(): void {
 }
 
 if ( is_multisite() ) {
-	$rsmw_site_ids = get_sites( array( 'fields' => 'ids' ) );
+	// 'number' => 0 : sans quoi get_sites() s'arrête aux 100 premiers sites et
+	// le reste du réseau garderait ses données en base, silencieusement.
+	$rsmw_site_ids = get_sites(
+		array(
+			'fields' => 'ids',
+			'number' => 0,
+		)
+	);
 
 	foreach ( $rsmw_site_ids as $rsmw_site_id ) {
 		switch_to_blog( (int) $rsmw_site_id );

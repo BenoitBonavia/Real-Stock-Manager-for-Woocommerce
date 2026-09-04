@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.6.3
+Stable tag: 0.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,16 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 0.7.0 =
+* La bascule automatique vers le statut « Précommande » est de retour, en option (Réglages → Précommandes → Statut automatique, décochée par défaut). Une commande contenant des articles précommandés reçoit désormais le marqueur ET le statut.
+* Trois différences avec le snippet remplacé : la décision se prend sur le marqueur et non sur is_on_backorder(), qui relit l’état courant du produit et se trompe dès que la marchandise est revenue ; la bascule n’a lieu qu’une fois, donc sortir une commande du statut à la main reste possible ; et la sortie est automatique, StatusSync ramenant la commande en « À empaqueter » dès que ses lignes sont pointées.
+* La bascule est suspendue tant que « precommande » ne figure pas dans les « Statuts à préparer ». Sans cette garde, chaque précommande sortirait du circuit : absente de « Besoins & stock », jamais servie par l’entrée de stock, jamais ramenée en « À empaqueter ».
+* Le statut « Précommande » compte maintenant comme un statut payé. Le chiffre d’affaires d’une précommande restait hors des rapports pendant toute l’attente du fournisseur alors que l’argent est encaissé, et la note d’achat disparaissait de l’espace client.
+* Correctif : payment_complete() devenait un no-op sur une commande en « Précommande » — ni identifiant de transaction, ni date de paiement, ni passage en « En cours ». Une boutique encaissant par virement y aurait vu ses précommandes bloquées définitivement.
+* Correctif : les téléchargements du client restent accordés en « Précommande », comme en « En cours ».
+* La sémantique du statut (rapports, encaissement, téléchargements) est enregistrée hors module : désactiver le module ne fait plus sortir des rapports les commandes qui le portent.
+* Correctif : à la désinstallation, les métas de commande sont nettoyées dans wc_orders_meta comme dans postmeta, et le balayage multisite ne s’arrête plus aux 100 premiers sites.
 
 = 0.6.3 =
 * Le panneau de diagnostic alerte quand des commandes portent le statut « Précommande » alors que ce statut ne figure pas dans les statuts suivis. Ces commandes sont alors hors du circuit de préparation : absentes de « Besoins & stock », et l’entrée de stock ne leur attribue rien. Rien ne le signalait à l’écran — la commande avait simplement l’air d’aller bien.
@@ -112,6 +122,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.7.0 =
+La bascule automatique de statut revient, en option et décochée par défaut. Pour l’activer : ajoutez « precommande » aux Statuts à préparer, PUIS cochez Statut automatique. Le statut compte désormais comme payé, ce qui fait remonter le chiffre d’affaires des précommandes dans vos rapports, y compris passés.
 
 = 0.6.3 =
 Ajoute une alerte de diagnostic sur le statut « Précommande » laissé hors des statuts suivis. Aucune donnée n’est modifiée.

@@ -239,8 +239,54 @@ Le module sépare donc les deux :
 | **La trace** | métas de ligne de commande | à l'achat | jamais |
 | **L'état** | statut de commande | au fil du flux | librement, par WooCommerce ou à la main |
 
-Conséquence directe : **aucune bascule automatique de statut**. Le statut « Précommande » reste
-enregistré et sélectionnable à la main, et les commandes qui le portent déjà le gardent.
+Conséquence directe : le statut n'est plus jamais *nécessaire*. Il redevient un simple état de flux —
+ce qui, paradoxalement, permet de l'automatiser sans danger.
+
+### La bascule automatique, rétablie en 0.7.0
+
+`PreOrder\StatusFlip` replace la commande dans le statut « Précommande ». Optionnel, décoché par
+défaut : *Réglages → Précommandes → Statut automatique*.
+
+Trois différences avec le snippet remplacé, chacune corrigeant un défaut constaté :
+
+| | Snippet | Module |
+|---|---|---|
+| Décision | `is_on_backorder()` rejoué après l'achat | le **marqueur** de la commande |
+| Répétition | à chaque passage en « En cours » | **une seule fois** |
+| Sortie | jamais — statut manuel | `StatusSync` → « À empaqueter » au pointage |
+
+Le premier point est le plus important : `is_on_backorder()` lit l'état *courant* du produit, sans
+contexte de commande. Rejoué après l'achat, il répond « non » dès que la marchandise est revenue — le
+snippet ratait donc la bascule. Le marqueur, lui, dit ce qui a réellement été vendu.
+
+**La bascule est suspendue tant que `precommande` ne figure pas dans les « Statuts à préparer ».**
+Ce n'est pas de la prudence : sans cette garde, chaque précommande sortirait du circuit — absente de
+`Demand`, ignorée par `Allocator`, jamais ramenée en « À empaqueter » par `StatusSync`. Elle resterait
+bloquée. `Config::auto_status_is_operative()` porte cette règle, et le diagnostic affiche les trois
+états séparément : *demandée / statut suivi / effective*.
+
+**Priorité 30 sur `woocommerce_order_status_changed`, et ce n'est pas cosmétique.**
+`Preparation\Allocator` est sur le même hook en priorité 20 : il sert la commande dans le stock libre
+puis, si elle devient complète, appelle `StatusSync` qui la passe en « À empaqueter ». À égalité de
+priorité nous étions départagés par l'ordre d'enregistrement des modules, et nous écrasions un
+« À empaqueter » tout juste posé. Pour la même raison, `maybe_apply()` **ignore les arguments `$to` et
+`$order` du hook** — figés avant que les autres n'agissent — et relit la commande.
+
+### La sémantique du statut vit hors du module
+
+Trois filtres décrivent ce que « Précommande » *signifie* pour WooCommerce, et sont donc enregistrés
+avec le statut, pas avec le module :
+
+- `woocommerce_order_is_paid_statuses` — sans quoi le chiffre d'affaires d'une précommande sort des
+  rapports pendant toute l'attente du fournisseur, alors que l'argent est encaissé ;
+- `woocommerce_valid_order_statuses_for_payment_complete` — sans quoi `payment_complete()` devient un
+  **no-op silencieux** : une boutique encaissant par virement verrait ses précommandes bloquées là
+  définitivement ;
+- `woocommerce_order_is_download_permitted` — `WC_Order::is_download_permitted()` teste « Terminée »
+  ou « En cours » en dur, la bascule retirerait donc l'accès aux fichiers.
+
+Les laisser dans le module ferait qu'en le désactivant, des commandes qui n'ont pas bougé sortiraient
+des rapports.
 
 ### Ce que la bascule faisait bien, et qu'il a fallu rendre
 

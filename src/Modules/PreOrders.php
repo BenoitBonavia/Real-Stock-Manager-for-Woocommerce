@@ -15,6 +15,7 @@ use RSMW\PreOrder\Front;
 use RSMW\PreOrder\Marker;
 use RSMW\PreOrder\Migration;
 use RSMW\PreOrder\SnippetGuard;
+use RSMW\PreOrder\StatusFlip;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -69,6 +70,10 @@ final class PreOrders extends AbstractModule {
 		// administration.
 		Marker::register();
 		Front::register();
+
+		// Idem pour la bascule de statut : une commande passe en « En cours »
+		// depuis la passerelle de paiement, sur une requête sans back-office.
+		StatusFlip::register();
 
 		if ( is_admin() ) {
 			ProductDateField::register();

@@ -71,6 +71,15 @@ final class Legacy {
 	public const ORDER_DATE_MAX_META = '_rsmw_preorder_date_max';
 
 	/**
+	 * Marque une commande dont le statut « Précommande » a déjà été posé.
+	 *
+	 * La bascule automatique n'a lieu QU'UNE FOIS. Sans ce témoin, un marchand
+	 * qui sort volontairement une commande de « Précommande » la verrait y
+	 * retomber au changement de statut suivant.
+	 */
+	public const STATUS_APPLIED_META = '_rsmw_preorder_status_applied';
+
+	/**
 	 * Constructeur privé : classe de constantes, jamais instanciée.
 	 */
 	private function __construct() {}

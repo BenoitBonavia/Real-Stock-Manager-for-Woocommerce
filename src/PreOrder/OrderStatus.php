@@ -32,6 +32,62 @@ final class OrderStatus {
 
 		add_filter( 'wc_order_statuses', array( __CLASS__, 'add_to_order_statuses' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_style' ) );
+
+		/*
+		 * Sémantique du statut, enregistrée ICI et non dans le module.
+		 *
+		 * Ces trois filtres décrivent ce que « Précommande » SIGNIFIE pour
+		 * WooCommerce, pas la façon dont il est posé. Les laisser dans le module
+		 * ferait qu'en le désactivant, les commandes qui portent le statut
+		 * sortiraient des rapports et perdraient leurs téléchargements — alors
+		 * qu'elles n'ont pas bougé.
+		 */
+		add_filter( 'woocommerce_order_is_paid_statuses', array( __CLASS__, 'add_status' ) );
+		add_filter( 'woocommerce_valid_order_statuses_for_payment_complete', array( __CLASS__, 'add_status' ) );
+		add_filter( 'woocommerce_valid_order_statuses_for_payment', array( __CLASS__, 'add_status' ) );
+		add_filter( 'woocommerce_order_is_download_permitted', array( __CLASS__, 'allow_downloads' ), 10, 2 );
+	}
+
+	/**
+	 * Ajoute le statut à une liste de statuts de WooCommerce.
+	 *
+	 * @param array $statuses Statuts existants.
+	 *
+	 * @return array
+	 */
+	public static function add_status( $statuses ) {
+		$statuses = (array) $statuses;
+
+		if ( ! in_array( Legacy::STATUS_SLUG, $statuses, true ) ) {
+			$statuses[] = Legacy::STATUS_SLUG;
+		}
+
+		return $statuses;
+	}
+
+	/**
+	 * Accorde les téléchargements comme si la commande était « En cours ».
+	 *
+	 * `WC_Order::is_download_permitted()` teste « Terminée » ou « En cours » en
+	 * dur, sans passer par une liste filtrable : une précommande perdrait donc
+	 * l'accès aux fichiers. On réplique exactement la règle de « En cours »,
+	 * option de la boutique comprise.
+	 *
+	 * @param bool            $permitted Décision de WooCommerce.
+	 * @param \WC_Order|mixed $order     Commande.
+	 *
+	 * @return bool
+	 */
+	public static function allow_downloads( $permitted, $order ) {
+		if ( $permitted || ! $order instanceof \WC_Order ) {
+			return $permitted;
+		}
+
+		if ( ! $order->has_status( Legacy::STATUS_SLUG ) ) {
+			return $permitted;
+		}
+
+		return 'yes' === get_option( 'woocommerce_downloads_grant_access_after_payment' );
 	}
 
 	/**
@@ -76,11 +132,13 @@ final class OrderStatus {
 	 *
 	 * Inséré juste après « En attente de paiement », comme dans le snippet.
 	 *
-	 * Volontairement PAS ajouté à `woocommerce_order_is_paid_statuses` : le
-	 * snippet ne le faisait pas non plus. L'y ajouter changerait rétroactivement
-	 * la façon dont les commandes déjà dans ce statut sont comptées dans les
-	 * rapports. En pratique elles sont passées par « En cours » avant, donc leur
-	 * date de paiement est déjà renseignée.
+	 * Depuis la 0.7.0, il EST ajouté à `woocommerce_order_is_paid_statuses`
+	 * (cf. register). Le snippet remplacé ne le faisait pas, et je m'étais aligné
+	 * sur lui — à tort dès lors que la bascule est automatique : une commande
+	 * peut alors séjourner des semaines dans ce statut en attendant le
+	 * fournisseur, et son chiffre d'affaires sortait des rapports pendant tout ce
+	 * temps alors que l'argent est encaissé. La correction est rétroactive, ce
+	 * qui répare une sous-estimation au lieu d'en créer une.
 	 *
 	 * @param array $statuses Statuts existants, clés préfixées « wc- ».
 	 *
