@@ -170,6 +170,20 @@ final class Items {
 
 		Demand::flush();
 
+		/**
+		 * La quantité préparée d'une ligne vient de changer.
+		 *
+		 * Point d'accroche unique pour tout ce qui doit réagir à la couverture
+		 * d'une ligne : c'est le seul endroit par où passe une variation du
+		 * préparé. Le module Précommandes s'y abonne pour horodater la levée,
+		 * sans que les deux modules aient à se connaître.
+		 *
+		 * @param \WC_Order_Item_Product $item    Ligne de commande.
+		 * @param int                    $new_qty Quantité préparée après écriture.
+		 * @param int                    $max     Quantité voulue par le client.
+		 */
+		do_action( 'rsmw_line_prepared', $item, $new_qty, $max );
+
 		return array(
 			'delta'     => $delta,
 			'qty'       => $new_qty,

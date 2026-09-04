@@ -219,6 +219,92 @@ WooCommerce y est scopé.
 Une constante encore définie est signalée dans l'écran de réglages, et le champ correspondant reste
 volontairement modifiable — le désactiver ferait enregistrer une valeur vide par WooCommerce.
 
+## Module « Précommandes »
+
+Quand le fournisseur n'a pas de stock mais peut fabriquer à la demande, la boutique ouvre une
+**précommande**. Le module (`src/PreOrder/`) remplace cinq snippets : statut de commande, date
+d'expédition estimée, texte de disponibilité, libellé du bouton, badge promo, vue « À traiter ».
+
+### La trace n'est pas le statut
+
+C'est le défaut que ce module corrige. Les snippets faisaient porter l'information « c'est une
+précommande » par le **statut de commande**, or un statut est une valeur unique : dès que la commande
+avance vers la préparation puis l'expédition, la trace disparaît. Impossible de savoir a posteriori
+ce qui avait été précommandé.
+
+Le module sépare donc les deux :
+
+| | Où | Écrit quand | Réécrit ? |
+|---|---|---|---|
+| **La trace** | métas de ligne de commande | à l'achat | jamais |
+| **L'état** | statut de commande | au fil du flux | librement, par WooCommerce ou à la main |
+
+Conséquence directe : **aucune bascule automatique de statut**. Le statut « Précommande » reste
+enregistré et sélectionnable à la main, et les commandes qui le portent déjà le gardent.
+
+### Métas posées
+
+| Donnée | Clé | Emplacement |
+|---|---|---|
+| Date d'expédition estimée | `_mh_preorder_date` | produit **et** variation |
+| Date figée à l'achat | `_mh_preorder_date` | ligne de commande |
+| Date lisible par le client | `Expédition estimée` | ligne, **visible** |
+| Quantité précommandée | `_rsmw_preorder_qty` | ligne |
+| Levée de la précommande | `_rsmw_preorder_filled_at` | ligne |
+| Commande concernée | `_rsmw_has_preorder` | commande (index) |
+| Date promise la plus lointaine | `_rsmw_preorder_date_max` | commande (tri) |
+
+Les quatre premières clés sont **gelées** : elles sont écrites à l'identique par les snippets
+remplacés. `Expédition estimée` est délibérément une **chaîne littérale, pas un `__()`** — sur une
+méta de ligne, le libellé *est* la clé de stockage : le passer par la traduction rendrait orphelines
+toutes les métas déjà en base au premier changement de locale.
+
+Le drapeau au niveau commande n'est qu'un index. La vérité est sur la ligne ; sans lui, retrouver les
+précommandes imposerait de parcourir toutes les lignes de toutes les commandes.
+
+### Pose des marqueurs
+
+Sur `woocommerce_checkout_create_order_line_item`, qui couvre aussi le tunnel en blocs — le Store API
+délègue à `WC_Checkout::create_order_line_items()`. La quantité est lue en priorité sur la méta native
+`Backordered` que WooCommerce vient d'écrire, sinon recalculée : cette méta n'existe que si le réglage
+de rupture vaut « Autoriser, mais informer le client ».
+
+Le callback est **idempotent et purement déclaratif** : il n'écrit que des métas, aucun journal,
+aucun compteur, aucun mouvement de stock.
+
+Deux limites assumées. `woocommerce_new_order_item` est **mort** — il n'est plus émis que par des
+fonctions dépréciées : le back-office est rattrapé par `woocommerce_ajax_add_order_item_meta`, mais
+**l'API REST et le Point de vente ne sont pas couverts**. Et `is_on_backorder()` lit l'état *courant*
+du produit, sans contexte de commande : la condition n'est donc **jamais** rejouée après l'achat.
+
+### Levée
+
+`Preparation\Items::set_quantity()` émet `rsmw_line_prepared( $item, $prepared, $quantity )` — le seul
+point par où passe toute variation du préparé. Le module s'y abonne pour horodater la levée, sans que
+les deux modules aient à se connaître.
+
+### Reprise de l'historique
+
+Par lots, à chaque chargement de l'administration, en deux phases : les commandes portant
+`wc-precommande` (**sans toucher au statut**), puis celles dont une ligne porte une date d'expédition
+ou la méta native de rupture.
+
+Une commande déjà repassée en « En cours » et dont aucune ligne ne porte de méta est **définitivement
+perdue** — c'est exactement le trou que ce modèle vient boucher. Le volume repris s'affiche dans
+l'écran de réglages.
+
+### Bascule
+
+`PreOrder\SnippetGuard` a sa **propre** liste de sentinelles, séparée de celle de `Preparation`. Ce
+n'est pas de la duplication : `snippet_is_active()` est un OU plat sans notion de portée, et
+`Plugin::boot()` s'en sert pour conditionner *à la fois* le module et l'enregistrement du statut.
+Mutualiser les listes mettrait tout le module Préparation en veille dès qu'un seul snippet de
+précommande resterait actif.
+
+Ordre à respecter : **mettre à jour le plugin d'abord**, vérifier le diagnostic dans les réglages,
+**puis** désactiver les snippets. Retour arrière : les réactiver, le module se remet en veille au
+chargement suivant.
+
 ## Mises à jour depuis GitHub
 
 Le plugin embarque [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) 5.7

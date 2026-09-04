@@ -68,7 +68,23 @@ function rsmw_uninstall_delete_options(): void {
 	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_rsmw_stock_ordered' ) );
 	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_rsmw_stock_defective' ) );
 
-	foreach ( array( '_mh_prep_qty', '_mh_prep_from_stock', '_mh_prep_date', '_mh_prep_user', '_rsmw_prep_ordered' ) as $item_meta_key ) {
+	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_mh_preorder_date' ) );
+
+	$item_meta_keys = array(
+		'_mh_prep_qty',
+		'_mh_prep_from_stock',
+		'_mh_prep_date',
+		'_mh_prep_user',
+		'_rsmw_prep_ordered',
+		// Précommandes. « Expédition estimée » est une clé littérale, pas une
+		// traduction : c'est le libellé que le client voit sur sa commande.
+		'_mh_preorder_date',
+		'_rsmw_preorder_qty',
+		'_rsmw_preorder_filled_at',
+		'Expédition estimée',
+	);
+
+	foreach ( $item_meta_keys as $item_meta_key ) {
 		$wpdb->delete( $wpdb->prefix . 'woocommerce_order_itemmeta', array( 'meta_key' => $item_meta_key ) );
 	}
 	// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching

@@ -9,6 +9,8 @@ namespace RSMW;
 
 use RSMW\Admin\Admin;
 use RSMW\Modules\ModuleInterface;
+use RSMW\PreOrder\OrderStatus as PreOrderStatus;
+use RSMW\PreOrder\SnippetGuard as PreOrderSnippetGuard;
 use RSMW\Preparation\Config;
 use RSMW\Preparation\OrderStatus;
 use RSMW\Preparation\SnippetGuard;
@@ -112,6 +114,18 @@ final class Plugin {
 			OrderStatus::register();
 		}
 
+		/*
+		 * Même raisonnement pour le statut « Précommande », avec une garde
+		 * DISTINCTE : les deux listes de sentinelles doivent rester séparées, sans
+		 * quoi le seul snippet de précommande encore actif mettrait aussi toute la
+		 * préparation en veille.
+		 */
+		if ( PreOrderSnippetGuard::snippet_is_active() ) {
+			add_action( 'admin_notices', array( PreOrderSnippetGuard::class, 'render_notice' ) );
+		} else {
+			PreOrderStatus::register();
+		}
+
 		if ( is_admin() ) {
 			( new Admin() )->register();
 		}
@@ -144,6 +158,7 @@ final class Plugin {
 			'rsmw_module_classes',
 			array(
 				\RSMW\Modules\OrderPreparation::class,
+				\RSMW\Modules\PreOrders::class,
 			)
 		);
 	}

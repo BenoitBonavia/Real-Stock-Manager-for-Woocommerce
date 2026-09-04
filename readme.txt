@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.5.0
+Stable tag: 0.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,17 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 0.6.0 =
+* Nouveau module « Précommandes », qui remplace cinq snippets : statut de commande, date d’expédition estimée, texte de disponibilité, libellé du bouton d’achat, badge promo et vue « À traiter ».
+* La trace d’une précommande ne repose plus sur le statut de commande. Elle est posée à l’achat sur la ligne, en métas jamais réécrites : la commande peut passer en préparation puis être expédiée, elle reste identifiable comme précommande.
+* Plus aucune bascule automatique de statut. Le statut « Précommande » reste enregistré et sélectionnable à la main ; les commandes qui le portent le gardent.
+* Nouvelle vue « Précommandes » dans la liste des commandes, filtrée par méta et donc insensible au statut, plus la vue « À traiter » reconduite à partir des statuts réellement configurés.
+* Date d’expédition estimée par produit et par variation, figée sur la ligne au moment de l’achat : modifier la fiche produit n’altère plus les commandes déjà passées. Une variation sans date propre reprend celle du parent.
+* Horodatage de la levée : la ligne enregistre le moment où la marchandise est arrivée, ce qui permet de comparer le délai promis au délai tenu.
+* Reprise de l’historique par lots à la mise à jour, sur les commandes portant le statut et sur celles dont une ligne porte une date d’expédition ou la méta native de rupture. Le volume repris s’affiche dans les réglages.
+* La quantité précommandée n’est reconstituée que lorsque la méta native en donne le chiffre exact : une ligne qui ne porte qu’une date reste sans quantité, plutôt que de gonfler les statistiques d’un chiffre inventé. La commande, elle, est bien marquée dans tous les cas.
+* Le module reste en veille tant qu’un des cinq snippets est actif, avec une liste de sentinelles distincte de celle du module Préparation.
 
 = 0.5.0 =
 * Nouvel onglet « Réception d’un colis » : la page Gestion du stock propose la liste de ce qui est attendu, avec deux champs par référence — conforme et défectueux.
@@ -85,6 +96,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.6.0 =
+Nouveau module Précommandes. Mettez à jour AVANT de désactiver les cinq snippets : le module reste en veille tant qu’ils sont actifs, et la reprise de l’historique démarre dès la mise à jour. Aucun statut de commande n’est modifié.
 
 = 0.5.0 =
 Nouvel écran de réception en lot. Aucune donnée existante n’est modifiée.

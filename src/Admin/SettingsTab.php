@@ -9,6 +9,9 @@ namespace RSMW\Admin;
 
 use RSMW\Modules\ModuleInterface;
 use RSMW\Plugin;
+use RSMW\PreOrder\Migration as PreOrderMigration;
+use RSMW\PreOrder\OrderStatus as PreOrderStatus;
+use RSMW\PreOrder\SnippetGuard as PreOrderSnippetGuard;
 use RSMW\Preparation\Config;
 use RSMW\Preparation\Defects;
 use RSMW\Preparation\Items;
@@ -254,6 +257,25 @@ final class SettingsTab extends \WC_Settings_Page {
 			'<strong>' . esc_html( number_format_i18n( Defects::tracked_reference_count() ) ) . '</strong>',
 			'<strong>' . esc_html( number_format_i18n( Defects::total() ) ) . '</strong>'
 		);
+
+		if ( PreOrderSnippetGuard::snippet_is_active() ) {
+			$lines[] = '<strong style="color:#b32d2e">'
+				. esc_html__( 'Snippets de précommande détectés : le module Précommandes est en veille.', 'real-stock-manager-for-woocommerce' )
+				. '</strong>';
+		}
+
+		$lines[] = sprintf(
+			/* translators: 1: oui/non, 2: nombre de commandes, 3: nombre de commandes marquées, 4: nombre de lignes. */
+			esc_html__( 'Précommandes — statut enregistré : %1$s · commandes dans le statut : %2$s · commandes tracées : %3$s · lignes précommandées : %4$s', 'real-stock-manager-for-woocommerce' ),
+			$this->yes_no( PreOrderStatus::is_registered() ),
+			'<strong>' . esc_html( number_format_i18n( PreOrderStatus::order_count() ) ) . '</strong>',
+			'<strong>' . esc_html( number_format_i18n( PreOrderMigration::marked_order_count() ) ) . '</strong>',
+			'<strong>' . esc_html( number_format_i18n( PreOrderMigration::marked_line_count() ) ) . '</strong>'
+		);
+
+		if ( ! PreOrderMigration::is_done() ) {
+			$lines[] = esc_html__( 'Reprise de l’historique des précommandes en cours : elle avance à chaque chargement de l’administration.', 'real-stock-manager-for-woocommerce' );
+		}
 
 		$statuses = Config::statuses();
 
