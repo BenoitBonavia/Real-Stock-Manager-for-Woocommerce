@@ -24,10 +24,22 @@ defined( 'ABSPATH' ) || exit;
 final class SnippetGuard {
 
 	/**
-	 * Fonctions des cinq snippets servant de témoin de présence.
+	 * Fonctions des snippets servant de témoin de présence.
 	 *
 	 * Une par snippet, pour détecter aussi le cas où le marchand n'en aurait
 	 * désactivé qu'une partie.
+	 *
+	 * `ds_change_sale_text` A ÉTÉ RETIRÉE DE CETTE LISTE, délibérément. Elle ne
+	 * surcharge que le libellé du badge promotionnel : elle ne crée ni statut, ni
+	 * méta, ni vue, donc sa présence ne produit aucun doublon de données. Or le
+	 * marchand a gardé une fonction de ce nom pour une règle « Déstockage » sans
+	 * rapport avec les précommandes, et la sentinelle mettait alors tout le module
+	 * en veille — jusqu'à désenregistrer le statut « Précommande », ce qui faisait
+	 * disparaître les commandes concernées des écrans d'administration.
+	 *
+	 * Règle qu'on en tire : ne servent de sentinelle que les snippets qui écrivent
+	 * ou déclarent quelque chose. Un simple filtre d'affichage n'en est pas un —
+	 * s'il coexiste avec le module, le nôtre s'applique après et l'emporte.
 	 *
 	 * @var string[]
 	 */
@@ -35,7 +47,6 @@ final class SnippetGuard {
 		'enregistrer_statut_precommande',
 		'mh_preorder_get_raw_date',
 		'mh_preorder_availability_text',
-		'ds_change_sale_text',
 		'auto_attribuer_statut_precommande_restock',
 		'add_a_traiter_custom_order_view',
 	);
@@ -72,15 +83,35 @@ final class SnippetGuard {
 			return;
 		}
 
+		/*
+		 * On NOMME les fonctions détectées. Sans cela, l'avertissement laisse le
+		 * marchand chercher lequel de ses snippets bloque le module — et le coût
+		 * de cette devinette est élevé, puisque la mise en veille désenregistre
+		 * aussi le statut « Précommande ».
+		 */
+		$detected = self::detected_functions();
+
 		printf(
-			'<div class="notice notice-warning"><p><strong>%s</strong> — %s</p><p>%s</p></div>',
+			'<div class="notice notice-warning"><p><strong>%s</strong> — %s</p><p>%s</p><p>%s</p></div>',
 			esc_html__( 'Real Stock Manager for WooCommerce', 'real-stock-manager-for-woocommerce' ),
 			esc_html__(
 				'Les snippets de précommande sont toujours actifs : le module du plugin reste en veille pour éviter les doublons.',
 				'real-stock-manager-for-woocommerce'
 			),
+			sprintf(
+				/* translators: %s: liste des noms de fonctions détectées. */
+				esc_html(
+					_n(
+						'Fonction détectée : %s.',
+						'Fonctions détectées : %s.',
+						count( $detected ),
+						'real-stock-manager-for-woocommerce'
+					)
+				),
+				'<code>' . implode( '</code>, <code>', array_map( 'esc_html', $detected ) ) . '</code>'
+			),
 			esc_html__(
-				'Désactivez-les, puis rechargez cette page. Vos dates d’expédition et vos commandes en « Précommande » sont conservées : le plugin utilise exactement les mêmes données.',
+				'Désactivez le ou les snippets correspondants, puis rechargez cette page. Vos dates d’expédition et vos commandes en « Précommande » sont conservées : le plugin utilise exactement les mêmes données.',
 				'real-stock-manager-for-woocommerce'
 			)
 		);

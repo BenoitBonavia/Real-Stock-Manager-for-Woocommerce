@@ -221,7 +221,7 @@ final class SettingsTab extends \WC_Settings_Page {
 		if ( SnippetGuard::snippet_is_active() ) {
 			$lines[] = '<strong style="color:#b32d2e">'
 				. esc_html__( 'Snippet détecté : le module est en veille. Désactivez le snippet pour que le plugin prenne le relais.', 'real-stock-manager-for-woocommerce' )
-				. '</strong>';
+				. '</strong> ' . $this->function_list( SnippetGuard::detected_functions() );
 		} else {
 			$lines[] = '<span style="color:#00a32a">'
 				. esc_html__( 'Aucun snippet concurrent détecté.', 'real-stock-manager-for-woocommerce' )
@@ -261,7 +261,7 @@ final class SettingsTab extends \WC_Settings_Page {
 		if ( PreOrderSnippetGuard::snippet_is_active() ) {
 			$lines[] = '<strong style="color:#b32d2e">'
 				. esc_html__( 'Snippets de précommande détectés : le module Précommandes est en veille.', 'real-stock-manager-for-woocommerce' )
-				. '</strong>';
+				. '</strong> ' . $this->function_list( PreOrderSnippetGuard::detected_functions() );
 		}
 
 		$lines[] = sprintf(
@@ -303,6 +303,36 @@ final class SettingsTab extends \WC_Settings_Page {
 		}
 
 		return implode( '<br>', $lines );
+	}
+
+	/**
+	 * Rend la liste des fonctions qui mettent un module en veille.
+	 *
+	 * Nommer la fonction évite au marchand de chercher lequel de ses snippets
+	 * bloque le module — une devinette d'autant plus coûteuse qu'une mise en
+	 * veille désenregistre aussi le statut de commande associé.
+	 *
+	 * @param string[] $functions Fonctions détectées.
+	 *
+	 * @return string
+	 */
+	private function function_list( array $functions ): string {
+		if ( empty( $functions ) ) {
+			return '';
+		}
+
+		return sprintf(
+			/* translators: %s: liste des noms de fonctions détectées. */
+			esc_html(
+				_n(
+					'Fonction détectée : %s.',
+					'Fonctions détectées : %s.',
+					count( $functions ),
+					'real-stock-manager-for-woocommerce'
+				)
+			),
+			'<code>' . implode( '</code>, <code>', array_map( 'esc_html', $functions ) ) . '</code>'
+		);
 	}
 
 	/**

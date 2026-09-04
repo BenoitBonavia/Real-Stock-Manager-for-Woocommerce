@@ -75,12 +75,28 @@ final class SnippetGuard {
 			return;
 		}
 
+		// On nomme les fonctions détectées : sans cela, le marchand doit deviner
+		// lequel de ses snippets met le module en veille.
+		$detected = self::detected_functions();
+
 		printf(
-			'<div class="notice notice-warning"><p><strong>%s</strong> — %s</p><p>%s</p></div>',
+			'<div class="notice notice-warning"><p><strong>%s</strong> — %s</p><p>%s</p><p>%s</p></div>',
 			esc_html__( 'Real Stock Manager for WooCommerce', 'real-stock-manager-for-woocommerce' ),
 			esc_html__(
 				'Le snippet de préparation des commandes est toujours actif : le module du plugin reste en veille pour éviter les doublons.',
 				'real-stock-manager-for-woocommerce'
+			),
+			sprintf(
+				/* translators: %s: liste des noms de fonctions détectées. */
+				esc_html(
+					_n(
+						'Fonction détectée : %s.',
+						'Fonctions détectées : %s.',
+						count( $detected ),
+						'real-stock-manager-for-woocommerce'
+					)
+				),
+				'<code>' . implode( '</code>, <code>', array_map( 'esc_html', $detected ) ) . '</code>'
 			),
 			esc_html__(
 				'Désactivez le snippet, puis rechargez cette page. Vos stocks, vos pointages et vos commandes « À empaqueter » sont conservés : le plugin utilise exactement les mêmes données.',

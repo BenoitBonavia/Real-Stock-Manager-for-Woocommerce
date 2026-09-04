@@ -353,6 +353,23 @@ n'est pas de la duplication : `snippet_is_active()` est un OU plat sans notion d
 Mutualiser les listes mettrait tout le module Préparation en veille dès qu'un seul snippet de
 précommande resterait actif.
 
+**Ce qui fait une sentinelle valable** — seulement un snippet qui **écrit ou déclare** quelque chose :
+un statut, une méta, une vue, un automatisme. Un simple filtre d'affichage n'en est pas un.
+
+La leçon a été apprise à ses dépens : `ds_change_sale_text` avait été mise dans la liste. Elle ne
+surcharge pourtant que le libellé du badge promotionnel — aucun doublon de données possible. Or c'est
+un nom générique qu'un marchand peut légitimement réutiliser pour une règle sans rapport (une
+catégorie « outlet », par exemple). La sentinelle mettait alors tout le module en veille, **jusqu'à
+désenregistrer le statut « Précommande »** — et les commandes concernées disparaissaient des écrans
+d'administration. Elle a été retirée en 0.6.2.
+
+Corollaire : quand un filtre d'affichage du marchand coexiste avec le module, les deux s'appliquent.
+Le nôtre est enregistré plus tard — WPCode exécute ses snippets sur `plugins_loaded` en priorité 5, le
+plugin démarre en 20 — donc il passe en second et l'emporte sur les articles précommandés.
+
+L'avertissement d'administration et le panneau de diagnostic **nomment** les fonctions détectées.
+Sans cela, le marchand doit deviner lequel de ses snippets bloque le module.
+
 Ordre à respecter : **mettre à jour le plugin d'abord**, vérifier le diagnostic dans les réglages,
 **puis** désactiver les snippets. Retour arrière : les réactiver, le module se remet en veille au
 chargement suivant.

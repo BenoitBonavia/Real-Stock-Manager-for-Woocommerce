@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.6.1
+Stable tag: 0.6.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,11 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 0.6.2 =
+* Correctif : `ds_change_sale_text` ne fait plus partie des sentinelles qui mettent le module Précommandes en veille. Ce snippet ne surcharge que le libellé du badge promotionnel — il ne crée ni statut, ni méta, ni vue — mais son nom est générique et un marchand peut légitimement le réutiliser pour une règle sans rapport, une catégorie « outlet » par exemple. Le module se mettait alors en veille et le statut « Précommande » n’était plus enregistré, faisant disparaître les commandes concernées des écrans d’administration.
+* Règle retenue : ne servent de sentinelle que les snippets qui écrivent ou déclarent quelque chose. Un simple filtre d’affichage n’en est pas un ; s’il coexiste avec le module, celui du plugin s’applique après et l’emporte sur les articles précommandés.
+* L’avertissement d’administration et le panneau de diagnostic nomment désormais les fonctions détectées, pour les deux modules. Il fallait auparavant deviner lequel de ses snippets mettait le module en veille.
 
 = 0.6.1 =
 * Nouvelle colonne « Précommande » dans la liste des commandes, après « Préparation » : une commande contenant des articles précommandés se repère en balayant la liste, sans cliquer sur la vue. Elle affiche aussi la date d’expédition annoncée.
@@ -104,6 +109,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 0.6.2 =
+Correctif important si vous avez gardé une fonction nommée ds_change_sale_text : elle mettait le module Précommandes en veille et désenregistrait le statut « Précommande ». Aucune donnée n’est modifiée.
 
 = 0.6.1 =
 Colonne « Précommande » dans la liste des commandes. Aucune donnée n’est modifiée. Si la colonne n’apparaît pas, vérifiez « Options de l’écran » en haut de la liste.
