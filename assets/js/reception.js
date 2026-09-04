@@ -8,6 +8,23 @@
 ( function () {
 	'use strict';
 
+	/*
+	 * Filtre fournisseur : soumission au changement, pour épargner un clic.
+	 *
+	 * Branché AVANT la sortie anticipée ci-dessous : le sélecteur est présent même
+	 * quand le tableau ne l'est pas — c'est justement le cas où le marchand vient
+	 * de choisir un fournisseur qui n'attend rien et doit pouvoir en choisir un
+	 * autre. Le bouton « Filtrer » reste le chemin sans JavaScript.
+	 */
+	var supplierFilter = document.getElementById( 'rsmw-supplier-filter' );
+	var supplierSelect = document.getElementById( 'rsmw-supplier' );
+
+	if ( supplierFilter && supplierSelect ) {
+		supplierSelect.addEventListener( 'change', function () {
+			supplierFilter.submit();
+		} );
+	}
+
 	var table = document.getElementById( 'rsmw-reception-table' );
 
 	if ( ! table ) {

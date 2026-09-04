@@ -12,10 +12,13 @@ use RSMW\Preparation\Admin\View;
 
 defined( 'ABSPATH' ) || exit;
 
-$rsmw_pending    = (array) $data['pending'];
-$rsmw_submitted  = (array) $data['submitted'];
-$rsmw_simulation = $data['simulation'];
-$rsmw_report     = $data['report'];
+$rsmw_pending       = (array) $data['pending'];
+$rsmw_submitted     = (array) $data['submitted'];
+$rsmw_simulation    = $data['simulation'];
+$rsmw_report        = $data['report'];
+$rsmw_supplier      = (string) $data['supplier'];
+$rsmw_supplier_name = (string) $data['supplier_name'];
+$rsmw_choices       = (array) $data['supplier_list'];
 ?>
 <div class="wrap woocommerce rsmw-wrap">
 
@@ -114,7 +117,72 @@ $rsmw_report     = $data['report'];
 		<?php esc_html_e( 'Saisissez ce que le colis contient réellement. Rien n’est enregistré tant que vous n’avez pas validé, et les lignes laissées vides sont ignorées. Un article défectueux n’entre pas en stock : il cesse d’être attendu et la référence remonte dans « Reste à commander ».', 'real-stock-manager-for-woocommerce' ); ?>
 	</p>
 
-	<?php if ( empty( $rsmw_pending ) ) : ?>
+	<?php if ( ! empty( $rsmw_choices ) ) : ?>
+		<?php
+		/*
+		 * Formulaire GET AUTONOME, volontairement placé hors du formulaire de
+		 * réception : un formulaire imbriqué est invalide, et le navigateur
+		 * n'enverrait pas ce qu'on croit. Il fonctionne sans JavaScript ; le
+		 * script se contente de le soumettre au changement pour épargner un clic.
+		 */
+		?>
+		<form method="get" class="rsmw-card rsmw-supplier-filter" id="rsmw-supplier-filter">
+			<input type="hidden" name="page" value="<?php echo esc_attr( \RSMW\Preparation\Legacy::PAGE_STOCK ); ?>">
+			<input type="hidden" name="tab" value="<?php echo esc_attr( StockPage::TAB_RECEPTION ); ?>">
+
+			<div class="rsmw-card__body">
+				<label for="rsmw-supplier"><strong><?php esc_html_e( 'Colis reçu de', 'real-stock-manager-for-woocommerce' ); ?></strong></label>
+				<select name="supplier" id="rsmw-supplier">
+					<option value=""><?php esc_html_e( 'Tous les fournisseurs', 'real-stock-manager-for-woocommerce' ); ?></option>
+					<?php foreach ( $rsmw_choices as $rsmw_choice ) : ?>
+						<option value="<?php echo esc_attr( $rsmw_choice['slug'] ); ?>"
+							<?php selected( $rsmw_supplier, $rsmw_choice['slug'] ); ?>>
+							<?php
+							printf(
+								/* translators: 1: nom du fournisseur, 2: nombre de références attendues. */
+								esc_html__( '%1$s (%2$s)', 'real-stock-manager-for-woocommerce' ),
+								esc_html( $rsmw_choice['label'] ),
+								esc_html( number_format_i18n( (int) $rsmw_choice['count'] ) )
+							);
+							?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+				<button type="submit" class="button"><?php esc_html_e( 'Filtrer', 'real-stock-manager-for-woocommerce' ); ?></button>
+
+				<?php if ( '' !== $rsmw_supplier ) : ?>
+					<a class="button" href="<?php echo esc_url( StockPage::reception_url() ); ?>">
+						<?php esc_html_e( 'Tout afficher', 'real-stock-manager-for-woocommerce' ); ?>
+					</a>
+				<?php endif; ?>
+
+				<span class="rsmw-field__hint">
+					<?php esc_html_e( 'Ne garde que les références de ce fournisseur : vous ne pointez que ce que le colis peut contenir.', 'real-stock-manager-for-woocommerce' ); ?>
+				</span>
+			</div>
+		</form>
+	<?php endif; ?>
+
+	<?php if ( empty( $rsmw_pending ) && '' !== $rsmw_supplier ) : ?>
+		<?php /* Vide INTENTIONNEL : le serveur sait que ce fournisseur n'attend rien. Le message générique laisserait croire qu'il n'y a rien nulle part. */ ?>
+		<div class="rsmw-card">
+			<div class="rsmw-card__body">
+				<div class="rsmw-empty">
+					<?php
+					printf(
+						/* translators: %s: nom du fournisseur. */
+						esc_html__( 'Rien n’est attendu de %s pour l’instant.', 'real-stock-manager-for-woocommerce' ),
+						'<strong>' . esc_html( $rsmw_supplier_name ) . '</strong>'
+					);
+					?>
+					<br>
+					<a href="<?php echo esc_url( StockPage::reception_url() ); ?>">
+						<?php esc_html_e( 'Afficher toutes les références attendues', 'real-stock-manager-for-woocommerce' ); ?>
+					</a>
+				</div>
+			</div>
+		</div>
+	<?php elseif ( empty( $rsmw_pending ) ) : ?>
 		<div class="rsmw-card">
 			<div class="rsmw-card__body">
 				<div class="rsmw-empty">
@@ -202,7 +270,19 @@ $rsmw_report     = $data['report'];
 
 			<div class="rsmw-card" id="rsmw-reception">
 				<div class="rsmw-card__header">
-					<h2 class="rsmw-card__title"><?php esc_html_e( 'En attente de réception', 'real-stock-manager-for-woocommerce' ); ?></h2>
+						<h2 class="rsmw-card__title">
+						<?php if ( '' !== $rsmw_supplier_name ) : ?>
+							<?php
+							printf(
+								/* translators: %s: nom du fournisseur. */
+								esc_html__( 'En attente de %s', 'real-stock-manager-for-woocommerce' ),
+								esc_html( $rsmw_supplier_name )
+							);
+							?>
+						<?php else : ?>
+							<?php esc_html_e( 'En attente de réception', 'real-stock-manager-for-woocommerce' ); ?>
+						<?php endif; ?>
+					</h2>
 
 					<div class="rsmw-toolbar">
 						<label class="screen-reader-text" for="rsmw-reception-search">
@@ -239,7 +319,7 @@ $rsmw_report     = $data['report'];
 							$rsmw_def = isset( $rsmw_submitted[ $rsmw_id ]['defective'] ) ? (int) $rsmw_submitted[ $rsmw_id ]['defective'] : '';
 							?>
 							<tr data-rsmw-expected="<?php echo esc_attr( (string) $rsmw_row['expected'] ); ?>"
-								data-rsmw-search="<?php echo esc_attr( strtolower( remove_accents( $rsmw_row['name'] . ' ' . $rsmw_row['variant'] . ' ' . $rsmw_row['sku'] ) ) ); ?>">
+								data-rsmw-search="<?php echo esc_attr( strtolower( remove_accents( $rsmw_row['name'] . ' ' . $rsmw_row['variant'] . ' ' . $rsmw_row['sku'] . ' ' . $rsmw_row['fournisseur'] ) ) ); ?>">
 								<td>
 									<strong><?php echo esc_html( $rsmw_row['name'] ); ?></strong>
 									<?php if ( '' !== $rsmw_row['variant'] ) : ?>

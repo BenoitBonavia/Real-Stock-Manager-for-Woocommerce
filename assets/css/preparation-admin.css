@@ -630,3 +630,25 @@
 .nav-tab .rsmw-tab-count::after {
 	content: ")";
 }
+
+/*
+ * Filtre fournisseur de l'onglet « Réception d'un colis ».
+ *
+ * Formulaire GET autonome, posé hors du formulaire de réception : deux
+ * formulaires ne peuvent pas s'imbriquer. Il se présente comme une carte, pour
+ * qu'on ne le lise pas comme une partie du tableau de saisie.
+ */
+.rsmw-supplier-filter .rsmw-card__body {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+}
+
+.rsmw-supplier-filter select {
+	min-width: 240px;
+}
+
+.rsmw-supplier-filter .rsmw-field__hint {
+	flex: 1 1 260px;
+}

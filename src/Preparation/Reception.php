@@ -7,6 +7,8 @@
 
 namespace RSMW\Preparation;
 
+use RSMW\Suppliers\Resolver;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -50,6 +52,22 @@ final class Reception {
 
 		Labels::prime( $ids );
 
+		/*
+		 * Fournisseur de chaque référence, en une requête. Les parents connus de la
+		 * carte des besoins sont transmis ; pour les références venues du seul pool
+		 * de commandes fournisseur — celles sans aucune commande client — le
+		 * résolveur retombe sur get_post(), déjà en cache grâce à Labels::prime().
+		 */
+		$parents = array();
+
+		foreach ( $map as $product_id => $data ) {
+			if ( isset( $data['parent'] ) ) {
+				$parents[ (int) $product_id ] = (int) $data['parent'];
+			}
+		}
+
+		$suppliers = Resolver::map_for( $ids, $parents );
+
 		$rows = array();
 
 		foreach ( $ids as $product_id ) {
@@ -61,17 +79,20 @@ final class Reception {
 				continue;
 			}
 
-			$info = Labels::get( $product_id );
+			$info     = Labels::get( $product_id );
+			$supplier = isset( $suppliers[ $product_id ] ) ? $suppliers[ $product_id ] : null;
 
 			$rows[] = array(
-				'id'       => $product_id,
-				'name'     => $info['name'],
-				'variant'  => $info['variant'],
-				'sku'      => $info['sku'],
-				'expected' => $expected,
-				'reserved' => $reserved,
-				'free'     => $free,
-				'orders'   => isset( $map[ $product_id ]['commandes'] ) ? (int) $map[ $product_id ]['commandes'] : 0,
+				'id'           => $product_id,
+				'name'         => $info['name'],
+				'variant'      => $info['variant'],
+				'sku'          => $info['sku'],
+				'expected'     => $expected,
+				'reserved'     => $reserved,
+				'free'         => $free,
+				'orders'       => isset( $map[ $product_id ]['commandes'] ) ? (int) $map[ $product_id ]['commandes'] : 0,
+				'fournisseur'  => $supplier ? $supplier->name : '',
+				'supplierslug' => $supplier ? $supplier->slug : '',
 			);
 		}
 

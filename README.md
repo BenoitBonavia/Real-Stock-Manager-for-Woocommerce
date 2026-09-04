@@ -488,6 +488,31 @@ La page traitait ses POST dans `render()`, donc après l'envoi de l'en-tête —
 possible. Tolérable pour une réaffectation, inacceptable pour « j'ai commandé douze articles », qu'un
 F5 aurait enregistré deux fois.
 
+### Filtrer la réception par fournisseur
+
+L'onglet « Réception d'un colis » porte un sélecteur « Colis reçu de ». Trois décisions :
+
+- **le filtre survit à la redirection** (`StockPage::redirect()`). Sans cela, le marchand qui vient de
+  pointer un colis retomberait sur la liste complète, et la réapparition des autres références lui
+  ferait croire que rien n'a été enregistré ;
+- **le sélecteur ne liste que les fournisseurs qui attendent quelque chose**, avec le compteur. Il
+  répond à « de qui ce colis peut-il venir ? », pas à « qui est-ce que je connais ? ». « Sans
+  fournisseur » y figure dès qu'une référence non affectée est attendue — sinon elle ne serait
+  réceptionnable par aucun filtre ;
+- **c'est un formulaire GET autonome**, posé hors du formulaire de réception : deux formulaires ne
+  peuvent pas s'imbriquer, et celui de saisie enveloppe déjà tout le tableau. Il marche sans
+  JavaScript ; le script ne fait que le soumettre au changement.
+
+### Deux slugs réservés
+
+`general` et `sans-fournisseur` désignent les filtres du plugin dans l'URL. Un fournisseur nommé
+« Général » ou « Sans fournisseur » produirait exactement le même slug — et ses références
+deviendraient invisibles dans son propre onglet, derrière un compteur qui les annonce pourtant.
+
+`Suppliers\Taxonomy::reserve_slugs()` règle le conflit **là où il naît**, sur le filtre
+`wp_unique_term_slug`, plutôt que de l'arbitrer à la lecture dans chaque écran. Toute nouvelle
+constante de filtre adossée à un slug de fournisseur doit être ajoutée à `RESERVED_SLUGS`.
+
 ### Contrat du JavaScript
 
 `assets/js/needs-table.js` filtre, trie et exporte **côté client**, sur les `data-*` du `<tr>` — jamais

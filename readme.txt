@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,13 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 1.1.0 =
+* Onglet « Réception d’un colis » : un sélecteur « Colis reçu de » filtre les références attendues par fournisseur, avec le nombre attendu chez chacun. On ne pointe plus que ce que le colis peut contenir.
+* Le filtre survit à l’enregistrement : après avoir pointé un colis, la page revient sur le même fournisseur. Sans cela, la réapparition des autres références donnerait à croire que rien n’a été enregistré.
+* Le sélecteur ne propose que les fournisseurs qui attendent réellement quelque chose, et « Sans fournisseur » si des références non affectées sont attendues — faute de quoi elles ne seraient réceptionnables par aucun filtre.
+* Le nom du fournisseur entre dans la recherche de l’onglet, et le filtre fonctionne sans JavaScript.
+* Correctif : un fournisseur nommé « Général » ou « Sans fournisseur » produisait un slug identique à celui d’un filtre du plugin. Ses références devenaient alors invisibles dans son propre onglet, derrière un compteur qui les annonçait pourtant. Ces deux slugs sont désormais réservés à la création du fournisseur.
 
 = 1.0.0 =
 * Première version majeure. Les snippets WPCode que cette extension remplaçait sont tous repris : préparation des commandes et stock physique, commandes fournisseur, réception de colis, précommandes, et désormais les fournisseurs eux-mêmes.
@@ -137,6 +144,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Filtre par fournisseur sur la réception de colis. Aucune donnée n’est modifiée. Si vous aviez déjà créé un fournisseur nommé « Général » ou « Sans fournisseur », renommez-le : son slug entrait en conflit avec les filtres du plugin.
 
 = 1.0.0 =
 Nouvelle gestion des fournisseurs et onglets sur « Besoins & stock ». Aucune donnée existante n’est modifiée. Au premier chargement, toutes vos références seront dans l’onglet « Sans fournisseur » : affectez-les depuis la fiche produit, onglet Inventaire.

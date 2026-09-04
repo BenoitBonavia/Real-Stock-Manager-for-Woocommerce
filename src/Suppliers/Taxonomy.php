@@ -36,6 +36,27 @@ final class Taxonomy {
 	public const NAME = 'rsmw_supplier';
 
 	/**
+	 * Slugs que le plugin s'est réservés pour ses propres filtres.
+	 *
+	 * Les onglets de « Besoins & stock » et le filtre de réception désignent le
+	 * fournisseur par son slug dans l'URL, et emploient ces deux valeurs pour
+	 * « tout » et « sans fournisseur ». Un fournisseur nommé « Général » ou
+	 * « Sans fournisseur » produirait exactement le même slug, et le filtre
+	 * afficherait alors « rien à recevoir » devant un compteur annonçant sept
+	 * références — les siennes, devenues inatteignables.
+	 *
+	 * On règle le conflit là où il naît, à la création du terme, plutôt que de
+	 * l'arbitrer à la lecture dans chaque écran.
+	 *
+	 * @see \RSMW\Preparation\Admin\NeedsPage::TAB_ALL
+	 * @see \RSMW\Preparation\Admin\NeedsPage::TAB_NONE
+	 * @see \RSMW\Preparation\Admin\StockPage::SUPPLIER_NONE
+	 *
+	 * @var string[]
+	 */
+	public const RESERVED_SLUGS = array( 'general', 'sans-fournisseur' );
+
+	/**
 	 * Accroche l'enregistrement et l'entrée de menu.
 	 */
 	public static function register(): void {
@@ -46,6 +67,43 @@ final class Taxonomy {
 		add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 61 );
 		add_filter( 'parent_file', array( __CLASS__, 'keep_menu_open' ) );
 		add_filter( 'submenu_file', array( __CLASS__, 'keep_submenu_open' ), 10, 2 );
+
+		// Émis par wp_insert_term() comme par wp_update_term() : les deux chemins
+		// de création d'un slug passent par là.
+		add_filter( 'wp_unique_term_slug', array( __CLASS__, 'reserve_slugs' ), 10, 2 );
+	}
+
+	/**
+	 * Écarte un fournisseur des slugs réservés par le plugin.
+	 *
+	 * @param string       $slug Slug retenu par WordPress.
+	 * @param object|mixed $term Terme en cours d'enregistrement.
+	 *
+	 * @return string
+	 */
+	public static function reserve_slugs( $slug, $term ) {
+		if ( ! is_object( $term ) || ! isset( $term->taxonomy ) || self::NAME !== $term->taxonomy ) {
+			return $slug;
+		}
+
+		if ( ! in_array( $slug, self::RESERVED_SLUGS, true ) ) {
+			return $slug;
+		}
+
+		/*
+		 * Même suffixe numérique que WordPress emploie pour dédoublonner. La borne
+		 * n'est pas de la superstition : `term_exists()` interroge la base à chaque
+		 * tour, et une boucle non bornée dans un filtre bloquerait l'écran.
+		 */
+		for ( $suffix = 2; $suffix < 100; $suffix++ ) {
+			$candidate = $slug . '-' . $suffix;
+
+			if ( ! term_exists( $candidate, self::NAME ) ) {
+				return $candidate;
+			}
+		}
+
+		return $slug . '-' . wp_generate_password( 6, false );
 	}
 
 	/**

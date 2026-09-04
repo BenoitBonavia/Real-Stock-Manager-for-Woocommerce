@@ -14,6 +14,7 @@ use RSMW\Preparation\Legacy;
 use RSMW\Preparation\Reception;
 use RSMW\Preparation\Stock;
 use RSMW\Preparation\Supply;
+use RSMW\Suppliers\Resolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,6 +35,9 @@ final class StockPage {
 
 	/** Onglet de mouvement à l'unité. */
 	public const TAB_MOVEMENT = 'mouvement';
+
+	/** Valeur du filtre fournisseur désignant les références sans fournisseur. */
+	public const SUPPLIER_NONE = 'sans-fournisseur';
 
 	/** Nonce du formulaire de mouvement à l'unité. */
 	private const NONCE_MOVEMENT = 'rsmw_stock_movement';
@@ -85,6 +89,51 @@ final class StockPage {
 	 */
 	public static function tab_url( string $tab ): string {
 		return admin_url( 'admin.php?page=' . Legacy::PAGE_STOCK . '&tab=' . $tab );
+	}
+
+	/**
+	 * Adresse de l'onglet de réception, filtré sur un fournisseur.
+	 *
+	 * @param string $supplier Slug du fournisseur, chaîne vide pour tous.
+	 *
+	 * @return string
+	 */
+	public static function reception_url( string $supplier = '' ): string {
+		$url = self::tab_url( self::TAB_RECEPTION );
+
+		return '' === $supplier ? $url : $url . '&supplier=' . rawurlencode( $supplier );
+	}
+
+	/**
+	 * Fournisseur sur lequel la réception est filtrée.
+	 *
+	 * Liste blanche construite sur TOUS les fournisseurs déclarés, et non sur ceux
+	 * qui ont quelque chose en attente aujourd'hui : un signet posé sur l'un d'eux
+	 * doit rester valable la semaine où son colis est déjà arrivé, sinon le filtre
+	 * retomberait en silence sur la liste complète.
+	 *
+	 * @return string Slug, ou chaîne vide pour « tous ».
+	 */
+	public static function current_supplier(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- simple lecture de contexte d'affichage.
+		if ( ! isset( $_GET['supplier'] ) ) {
+			return '';
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- idem.
+		$slug = sanitize_title( wp_unslash( $_GET['supplier'] ) );
+
+		if ( self::SUPPLIER_NONE === $slug ) {
+			return $slug;
+		}
+
+		foreach ( Resolver::all() as $term ) {
+			if ( $term->slug === $slug ) {
+				return $slug;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -157,12 +206,18 @@ final class StockPage {
 	 * @param array $flash Compte rendu d'une réception venant d'être enregistrée.
 	 */
 	private static function render_reception( array $flash ): void {
+		$all      = Reception::pending();
+		$supplier = self::current_supplier();
+
 		View::render(
 			'reception-page',
 			array(
 				'tab'            => self::TAB_RECEPTION,
 				'tabs'           => self::tabs(),
-				'pending'        => Reception::pending(),
+				'pending'        => self::filter_by_supplier( $all, $supplier ),
+				'supplier'       => $supplier,
+				'supplier_name'  => self::supplier_name( $supplier ),
+				'supplier_list'  => self::supplier_choices( $all ),
 				'submitted'      => self::$submitted,
 				'simulation'     => self::$simulation,
 				'report'         => isset( $flash['reception'] ) ? $flash['reception'] : null,
@@ -171,6 +226,120 @@ final class StockPage {
 				'needs_page_url' => admin_url( 'admin.php?page=' . Legacy::PAGE_NEEDS ),
 			)
 		);
+	}
+
+	/**
+	 * Ne conserve que les références du fournisseur demandé.
+	 *
+	 * @param array  $rows     Toutes les références attendues.
+	 * @param string $supplier Slug, chaîne vide pour tous.
+	 *
+	 * @return array
+	 */
+	private static function filter_by_supplier( array $rows, string $supplier ): array {
+		if ( '' === $supplier ) {
+			return $rows;
+		}
+
+		$wanted = self::SUPPLIER_NONE === $supplier ? '' : $supplier;
+
+		return array_values(
+			array_filter(
+				$rows,
+				static function ( $row ) use ( $wanted ) {
+					return isset( $row['supplierslug'] ) && $row['supplierslug'] === $wanted;
+				}
+			)
+		);
+	}
+
+	/**
+	 * Choix du sélecteur de fournisseur, avec le nombre de références attendues.
+	 *
+	 * Le compteur est ce qui rend le sélecteur utile : le marchand voit d'un coup
+	 * d'œil chez qui il attend quelque chose, sans ouvrir chaque filtre. Seuls les
+	 * fournisseurs ayant au moins une référence en attente sont proposés — la
+	 * liste répond à « de qui ce colis peut-il venir ? », pas « qui connais-je ? ».
+	 *
+	 * @param array $rows Toutes les références attendues.
+	 *
+	 * @return array<int, array{slug:string, label:string, count:int}>
+	 */
+	private static function supplier_choices( array $rows ): array {
+		$counts = array();
+		$names  = array();
+
+		foreach ( $rows as $row ) {
+			$slug = isset( $row['supplierslug'] ) && '' !== $row['supplierslug']
+				? $row['supplierslug']
+				: self::SUPPLIER_NONE;
+
+			$counts[ $slug ] = isset( $counts[ $slug ] ) ? $counts[ $slug ] + 1 : 1;
+
+			$names[ $slug ] = '' !== (string) $row['fournisseur']
+				? $row['fournisseur']
+				: __( 'Sans fournisseur', 'real-stock-manager-for-woocommerce' );
+		}
+
+		$choices = array();
+		$taken   = false;
+
+		foreach ( Resolver::all() as $term ) {
+			if ( self::SUPPLIER_NONE === $term->slug ) {
+				$taken = true;
+			}
+
+			if ( isset( $counts[ $term->slug ] ) ) {
+				$choices[] = array(
+					'slug'  => $term->slug,
+					'label' => $term->name,
+					'count' => $counts[ $term->slug ],
+				);
+			}
+		}
+
+		/*
+		 * « Sans fournisseur » en dernier : c'est un reste, pas un fournisseur.
+		 *
+		 * Sauté si un vrai terme occupe déjà ce slug — cas qui ne peut plus se
+		 * produire depuis que Suppliers\Taxonomy réserve la valeur, mais qui reste
+		 * possible pour un fournisseur créé avant cette garde. Sans ce test, le
+		 * sélecteur afficherait deux fois la même option.
+		 */
+		if ( ! $taken && isset( $counts[ self::SUPPLIER_NONE ] ) ) {
+			$choices[] = array(
+				'slug'  => self::SUPPLIER_NONE,
+				'label' => $names[ self::SUPPLIER_NONE ],
+				'count' => $counts[ self::SUPPLIER_NONE ],
+			);
+		}
+
+		return $choices;
+	}
+
+	/**
+	 * Nom lisible du fournisseur filtré.
+	 *
+	 * @param string $supplier Slug.
+	 *
+	 * @return string
+	 */
+	private static function supplier_name( string $supplier ): string {
+		if ( '' === $supplier ) {
+			return '';
+		}
+
+		if ( self::SUPPLIER_NONE === $supplier ) {
+			return __( 'Sans fournisseur', 'real-stock-manager-for-woocommerce' );
+		}
+
+		foreach ( Resolver::all() as $term ) {
+			if ( $term->slug === $supplier ) {
+				return $term->name;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -375,7 +544,17 @@ final class StockPage {
 	 * @param string $tab Onglet.
 	 */
 	private static function redirect( string $tab ): void {
-		wp_safe_redirect( self::tab_url( $tab ) );
+		/*
+		 * La réception conserve son filtre fournisseur. Sans cela, le marchand qui
+		 * vient de pointer un colis d'un fournisseur retomberait sur la liste
+		 * complète — et croirait, en voyant réapparaître les références des autres,
+		 * que son enregistrement n'a pas pris.
+		 */
+		$url = self::TAB_RECEPTION === $tab
+			? self::reception_url( self::current_supplier() )
+			: self::tab_url( $tab );
+
+		wp_safe_redirect( $url );
 		exit;
 	}
 
