@@ -17,6 +17,7 @@ use RSMW\Preparation\Allocator;
 use RSMW\Preparation\Demand;
 use RSMW\Preparation\SnippetGuard;
 use RSMW\Preparation\StatusSync;
+use RSMW\Suppliers\Admin\ProductField as SupplierProductField;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -77,6 +78,15 @@ final class OrderPreparation extends AbstractModule {
 			OrdersColumn::register();
 			Pages::register();
 			ProductFields::register();
+
+			/*
+			 * Le champ « Fournisseur » est câblé ici, et non depuis un module à
+			 * lui : le fournisseur est une dimension de la préparation, pas un
+			 * comportement autonome. Pouvoir désactiver le champ pendant que les
+			 * onglets de la page « Besoins & stock » regroupent par fournisseur
+			 * n'aurait aucun sens. La taxonomie, elle, vit hors module.
+			 */
+			SupplierProductField::register();
 		}
 	}
 

@@ -146,7 +146,7 @@
 		event.preventDefault();
 
 		var lines = [
-			[ 'Reference', 'Demande', 'Deja pointe', 'Reste a preparer', 'Stock libre', 'En commande', 'Reste a commander', 'Commandes' ]
+			[ 'Reference', 'SKU', 'Fournisseur', 'Demande', 'Deja pointe', 'Reste a preparer', 'Stock libre', 'En commande', 'Reste a commander', 'Commandes' ]
 		];
 
 		rows.forEach( function ( row ) {
@@ -155,7 +155,7 @@
 			}
 
 			var d = row.dataset;
-			lines.push( [ d.name, d.demande, d.pointe, d.restant, d.libre, d.commande || 0, d.manque, d.commandes ] );
+			lines.push( [ d.name, d.sku || '', d.fournisseur || '', d.demande, d.pointe, d.restant, d.libre, d.commande || 0, d.manque, d.commandes ] );
 		} );
 
 		var csv = lines.map( function ( line ) {
@@ -173,4 +173,106 @@
 		link.click();
 		URL.revokeObjectURL( link.href );
 	} );
+
+	/*
+	 * Copie de la liste à commander.
+	 *
+	 * Le canal dominant d'une petite boutique est l'e-mail ou le portail du
+	 * fournisseur, pas l'import CSV. Le fichier impose de télécharger, ouvrir un
+	 * tableur, sélectionner, copier, coller, puis réparer l'encodage ; le
+	 * presse-papier, c'est un clic. D'où les deux formats.
+	 */
+	function orderedQuantity( row ) {
+		var input = row.querySelector( 'input[name^="rsmw_purchase"]' );
+
+		if ( input ) {
+			return parseInt( input.value, 10 ) || 0;
+		}
+
+		return parseInt( row.dataset.manque, 10 ) || 0;
+	}
+
+	function visibleLines( separator ) {
+		var lines = [];
+
+		rows.forEach( function ( row ) {
+			if ( row.style.display === 'none' ) {
+				return;
+			}
+
+			var quantity = orderedQuantity( row );
+
+			// Une ligne à zéro ne fait pas partie de la commande : l'inclure
+			// obligerait le fournisseur à la lire pour l'écarter lui-même.
+			if ( quantity <= 0 ) {
+				return;
+			}
+
+			var sku = row.dataset.sku || '';
+			var name = row.dataset.name || '';
+
+			if ( separator === '\t' ) {
+				lines.push( [ sku, name, quantity ].join( '\t' ) );
+
+				return;
+			}
+
+			lines.push( ( sku ? sku + ' — ' : '' ) + name + ' × ' + quantity );
+		} );
+
+		return lines.join( '\n' );
+	}
+
+	function copy( text, button ) {
+		var label = button.textContent;
+
+		function done() {
+			button.textContent = button.dataset.done || label;
+			window.setTimeout( function () {
+				button.textContent = label;
+			}, 2000 );
+		}
+
+		// navigator.clipboard exige un contexte sécurisé : sur un site de recette
+		// en HTTP simple, il est absent. Le repli par textarea + execCommand reste
+		// le seul mécanisme disponible dans ce cas.
+		if ( navigator.clipboard && window.isSecureContext ) {
+			navigator.clipboard.writeText( text ).then( done );
+
+			return;
+		}
+
+		var area = document.createElement( 'textarea' );
+
+		area.value = text;
+		area.setAttribute( 'readonly', 'readonly' );
+		area.style.position = 'fixed';
+		area.style.opacity = '0';
+		document.body.appendChild( area );
+		area.select();
+
+		try {
+			document.execCommand( 'copy' );
+			done();
+		} catch ( error ) {
+			// Rien à faire de plus : le texte reste sélectionné dans la zone.
+		}
+
+		document.body.removeChild( area );
+	}
+
+	var copyText = document.getElementById( 'rsmw-copy-text' );
+	var copyCells = document.getElementById( 'rsmw-copy-cells' );
+
+	if ( copyText ) {
+		copyText.addEventListener( 'click', function () {
+			copy( visibleLines( ' ' ), copyText );
+		} );
+	}
+
+	if ( copyCells ) {
+		copyCells.addEventListener( 'click', function () {
+			copy( visibleLines( '\t' ), copyCells );
+		} );
+	}
 }() );

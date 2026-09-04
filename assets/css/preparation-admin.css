@@ -595,3 +595,38 @@
 	border-top: 1px solid var(--rsmw-border-soft);
 	color: #8a6d1f;
 }
+
+/*
+ * Compteur des onglets de la page « Besoins & stock ».
+ *
+ * WordPress ne style `.count` que dans `.subsubsub`, et WooCommerce ne style la
+ * bulle `.update-plugins` que sur ses propres écrans de réglages : aucune des
+ * deux conventions n'a d'effet dans un `.nav-tab`. Le compteur y hériterait donc
+ * du gras et de la couleur du libellé, et ne se lirait plus comme secondaire.
+ * D'où cette règle, qui n'existe que pour ça.
+ */
+.nav-tab .rsmw-tab-count {
+	margin-left: 4px;
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+	color: var(--rsmw-text-muted, #646970);
+}
+
+/*
+ * « Sans fournisseur » : même rouge que la colonne « Reste à commander ». L'œil
+ * y lit déjà « ça vous coûte de l'argent ».
+ */
+.nav-tab .rsmw-tab-count--alert {
+	color: var(--rsmw-negative, #b32d2e);
+	font-weight: 600;
+}
+
+/* Le compteur ne doit jamais faire retomber les onglets sur deux lignes plus tôt
+   que nécessaire : pas de mise en forme de pastille, seulement du texte. */
+.nav-tab .rsmw-tab-count::before {
+	content: "(";
+}
+
+.nav-tab .rsmw-tab-count::after {
+	content: ")";
+}

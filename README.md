@@ -420,6 +420,84 @@ Ordre à respecter : **mettre à jour le plugin d'abord**, vérifier le diagnost
 **puis** désactiver les snippets. Retour arrière : les réactiver, le module se remet en veille au
 chargement suivant.
 
+## Fournisseurs
+
+Le marchand travaille en flux tendu avec plusieurs fournisseurs, et son geste réel est fournisseur par
+fournisseur. La page « Besoins & stock » a donc un onglet « Général », un onglet par fournisseur, et un
+onglet « Sans fournisseur ».
+
+### Une taxonomie, `rsmw_supplier`
+
+Non hiérarchique, attachée à **`product` seulement**, `show_ui => true` mais `show_in_menu => false` :
+l'écran natif `edit-tags.php` fournit tout le CRUD, sans apparaître sous « Produits ». Un
+`add_submenu_page( 'woocommerce', … )` le place sous le menu de l'extension, et les filtres
+`parent_file` / `submenu_file` empêchent WordPress d'ouvrir le menu Produits à la place.
+
+Deux raisons l'emportent sur un type de contenu :
+
+- le CRUD est **déjà écrit par WordPress**. Le contre-exemple chiffre l'alternative : la classe de
+  livraison de WooCommerce a `show_ui => false`, et il a fallu lui réécrire tout un écran en Backbone ;
+- `wp_delete_term()` **détache proprement chaque produit**. Un type de contenu laisserait des
+  identifiants pointant dans le vide sur des centaines de produits.
+
+`product_brand` a été écarté malgré la tentation : un distributeur livre plusieurs marques, et une
+marque arrive parfois par deux distributeurs.
+
+### Variations : remontée au parent
+
+Une « référence » de la table des besoins est l'ID de la **variation** quand la ligne en porte une
+(`Items::key()`). Or une variation ne porte pas de terme. `Suppliers\Resolver` remonte donc au parent —
+patron de `WC_Product_Variation::get_shipping_class_id()`. Conséquence assumée : **toutes les
+déclinaisons d'un produit partagent son fournisseur.**
+
+**Une requête pour toute la page.** L'ID parent était déjà sélectionné par la requête de demande sous
+l'alias `pid`, puis jeté ; `Demand::map()` le reporte maintenant sous la clé `parent`, et le résolveur
+fait un unique `wp_get_object_terms( …, 'all_with_object_id' )`.
+
+> Ne jamais passer par `wc_get_product_terms()` ici : il retombe sur `wp_get_post_terms()` et coûte
+> **une requête par produit** — invisible sur une fiche, ruineux sur un tableau de centaines de lignes.
+
+### L'onglet « Sans fournisseur » n'est pas décoratif
+
+Au démarrage, 100 % des références y sont. Et si le marchand travaille fournisseur par fournisseur,
+une référence sans terme **ne serait dans aucun onglet** : il ne la commanderait jamais. Il est donc en
+dernier, compteur en rouge, et **masqué dès qu'il est vide** — sa disparition signale que le catalogue
+est cartographié. L'onglet « Général » porte en renfort une colonne Fournisseur, et le nom du
+fournisseur entre dans `data-search`, ce qui permet de filtrer par fournisseur à la recherche.
+
+Les compteurs comptent les références à `manque > 0`, et non toutes celles du fournisseur : la case
+« Manquants uniquement » étant cochée d'entrée, c'est exactement ce que le marchand verra en ouvrant
+l'onglet. **Invariant, et test de recette** : somme des onglets fournisseurs + « Sans fournisseur » =
+compteur de « Général ».
+
+### Passer la commande depuis l'onglet
+
+C'est le vrai besoin derrière « pouvoir passer les commandes plus facilement ». Enregistrer une
+commande fournisseur imposait de passer par *Gestion stock → Mouvement à l'unité*, **une référence à la
+fois** : quinze allers-retours pour quinze lignes. En pratique le marchand ne le faisait pas — et comme
+il ne le faisait pas, `manque` ne baissait jamais et **la page lui redemandait chaque semaine de
+commander ce qu'il avait déjà commandé.**
+
+`Preparation\Purchase` est l'image miroir de `Reception` : saisie par ligne préremplie avec le manque,
+vérification avant écriture, puis un seul enregistrement qui délègue à
+`Allocator::order_from_supplier()`. Une commande fournisseur ne fait jamais basculer une commande
+client en « À empaqueter » : la marchandise n'est pas arrivée.
+
+**Prérequis** : `Pages::register()` accroche désormais `NeedsPage::handle_post` sur `load-{écran}`.
+La page traitait ses POST dans `render()`, donc après l'envoi de l'en-tête — aucune redirection
+possible. Tolérable pour une réaffectation, inacceptable pour « j'ai commandé douze articles », qu'un
+F5 aurait enregistré deux fois.
+
+### Contrat du JavaScript
+
+`assets/js/needs-table.js` filtre, trie et exporte **côté client**, sur les `data-*` du `<tr>` — jamais
+sur les cellules. Deux règles à respecter en touchant au gabarit :
+
+- les clés `data-*` restent **un seul mot en minuscules**. `data-supplier-id` deviendrait
+  `dataset.supplierId` et casserait la correspondance avec `th[data-key]`, sur laquelle repose le tri ;
+- le script déréférence une douzaine d'identifiants **sans test de nullité**. Barre d'outils et
+  `#mh-table` sont indissociables : quand il n'y a aucune ligne, le gabarit retire le bloc entier.
+
 ## Mises à jour depuis GitHub
 
 Le plugin embarque [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) 5.7

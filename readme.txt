@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.7.1
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,18 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 1.0.0 =
+* Première version majeure. Les snippets WPCode que cette extension remplaçait sont tous repris : préparation des commandes et stock physique, commandes fournisseur, réception de colis, précommandes, et désormais les fournisseurs eux-mêmes.
+* Gestion des fournisseurs : les créer, les renommer, les supprimer depuis WooCommerce → Fournisseurs, et désigner celui qui fournit chaque produit dans l’onglet Inventaire de sa fiche.
+* La page « Besoins & stock » a maintenant un onglet « Général » puis un onglet par fournisseur, chacun avec le nombre de références qu’il reste à lui commander. Les indicateurs — articles, reste à commander, valeur — ne portent que sur l’onglet ouvert : c’est le montant de la commande en cours de préparation.
+* Commande fournisseur en lot depuis son onglet : un champ par ligne, prérempli avec ce qui manque, une vérification avant écriture, puis un seul enregistrement. Il fallait auparavant passer par Gestion stock → Mouvement, une référence à la fois — quinze allers-retours pour une commande de quinze lignes.
+* Deux boutons de copie, l’un pour un e-mail, l’autre pour un tableur, et un export CSV dont le nom porte celui du fournisseur.
+* Onglet « Sans fournisseur », en dernier et masqué dès qu’il est vide. Sans lui, une référence non affectée n’apparaîtrait dans aucun onglet et ne serait jamais commandée. L’onglet « Général » porte en plus une colonne Fournisseur, avec un tiret rouge quand il manque.
+* Sur un produit à variations, le fournisseur du produit s’applique à toutes ses déclinaisons.
+* Le compteur « commandé au fournisseur » n’est pas modifié : un produit n’ayant qu’un fournisseur, celui-ci se déduit de la référence. Aucune migration, aucune donnée reprise.
+* Les formulaires de la page sont désormais traités avant l’envoi de l’en-tête, puis suivis d’une redirection : un rafraîchissement ne peut plus enregistrer deux fois la même commande fournisseur.
+* Supprimer un fournisseur détache simplement les produits qui le référençaient, sans autre effet.
 
 = 0.7.1 =
 * Page « Besoins & stock » : la case « Manquants uniquement » est cochée d’entrée. La page sert d’abord à savoir quoi commander ; le filtre est appliqué dès le chargement, indicateurs compris.
@@ -125,6 +137,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 1.0.0 =
+Nouvelle gestion des fournisseurs et onglets sur « Besoins & stock ». Aucune donnée existante n’est modifiée. Au premier chargement, toutes vos références seront dans l’onglet « Sans fournisseur » : affectez-les depuis la fiche produit, onglet Inventaire.
 
 = 0.7.1 =
 La case « Manquants uniquement » de Besoins & stock est cochée par défaut. Décochez-la pour retrouver la totalité des références.

@@ -36,6 +36,13 @@ final class Pages {
 		$screens = self::screen_ids();
 
 		add_action( 'load-' . $screens['stock'], array( StockPage::class, 'handle_post' ) );
+
+		/*
+		 * Même raison pour la page Besoins depuis qu'on y saisit une commande
+		 * fournisseur en lot : rejouer une réaffectation était sans conséquence,
+		 * rejouer « j'ai commandé douze articles » en enregistrerait vingt-quatre.
+		 */
+		add_action( 'load-' . $screens['needs'], array( NeedsPage::class, 'handle_post' ) );
 	}
 
 	/**

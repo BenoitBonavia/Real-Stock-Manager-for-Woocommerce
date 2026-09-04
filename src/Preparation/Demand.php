@@ -108,7 +108,7 @@ final class Demand {
 	 *
 	 * @param bool $use_cache Lire le cache si disponible.
 	 *
-	 * @return array<int, array{demande:int, pointe:int, restant:int, commandes:int, plus_vieux:?int}>
+	 * @return array<int, array{demande:int, pointe:int, restant:int, commande:int, commandes:int, plus_vieux:?int, parent:int}>
 	 */
 	public static function map( bool $use_cache = true ): array {
 		if ( $use_cache ) {
@@ -189,6 +189,17 @@ final class Demand {
 					'commande'   => 0,
 					'commandes'  => array(),
 					'plus_vieux' => null,
+
+					/*
+					 * Produit parent d'une variation, égal à la clé pour un produit
+					 * simple. WooCommerce garantit que `_product_id` porte le parent
+					 * sur une ligne de variation. On le retenait déjà pour calculer
+					 * la clé quelques lignes plus haut, sans le conserver : le
+					 * reporter ici coûte zéro requête et donne au regroupement par
+					 * fournisseur son point d'accroche, la taxonomie étant rattachée
+					 * au parent.
+					 */
+					'parent'     => (int) $row->pid > 0 ? (int) $row->pid : $key,
 				);
 			}
 

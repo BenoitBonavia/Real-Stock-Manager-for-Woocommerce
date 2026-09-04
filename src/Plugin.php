@@ -14,6 +14,7 @@ use RSMW\PreOrder\SnippetGuard as PreOrderSnippetGuard;
 use RSMW\Preparation\Config;
 use RSMW\Preparation\OrderStatus;
 use RSMW\Preparation\SnippetGuard;
+use RSMW\Suppliers\Taxonomy as SupplierTaxonomy;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -125,6 +126,15 @@ final class Plugin {
 		} else {
 			PreOrderStatus::register();
 		}
+
+		/*
+		 * La taxonomie « Fournisseur » est enregistrée hors module, pour la raison
+		 * qui vaut déjà pour les statuts : une taxonomie qui porte des données doit
+		 * rester déclarée. Sans elle, les fournisseurs et leur affectation aux
+		 * produits disparaîtraient des écrans d'administration — alors qu'ils sont
+		 * toujours en base.
+		 */
+		SupplierTaxonomy::register();
 
 		if ( is_admin() ) {
 			( new Admin() )->register();

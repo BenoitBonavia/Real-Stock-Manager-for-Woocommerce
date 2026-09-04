@@ -15,6 +15,8 @@ use RSMW\PreOrder\Migration as PreOrderMigration;
 use RSMW\PreOrder\OrderStatus as PreOrderStatus;
 use RSMW\PreOrder\SnippetGuard as PreOrderSnippetGuard;
 use RSMW\Preparation\Config;
+use RSMW\Suppliers\Resolver as SupplierResolver;
+use RSMW\Suppliers\Taxonomy as SupplierTaxonomy;
 use RSMW\Preparation\Defects;
 use RSMW\Preparation\Items;
 use RSMW\Preparation\Journal;
@@ -348,6 +350,17 @@ final class SettingsTab extends \WC_Settings_Page {
 			$this->yes_no( PreOrderConfig::auto_status() ),
 			$this->yes_no( PreOrderConfig::status_is_tracked() ),
 			$this->yes_no( PreOrderConfig::auto_status_is_operative() )
+		);
+
+		$suppliers = SupplierResolver::all();
+
+		$lines[] = sprintf(
+			/* translators: 1: nombre de fournisseurs, 2: lien vers l'écran de gestion. */
+			esc_html__( 'Fournisseurs déclarés : %1$s · %2$s', 'real-stock-manager-for-woocommerce' ),
+			'<strong>' . esc_html( number_format_i18n( count( $suppliers ) ) ) . '</strong>',
+			'<a href="' . esc_url( SupplierTaxonomy::manage_url() ) . '">'
+				. esc_html__( 'les gérer', 'real-stock-manager-for-woocommerce' )
+				. '</a>'
 		);
 
 		$statuses = Config::statuses();

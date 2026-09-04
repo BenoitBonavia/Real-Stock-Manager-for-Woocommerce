@@ -63,6 +63,32 @@ function rsmw_uninstall_delete_options(): void {
 	// Données métier, sur demande explicite uniquement.
 	delete_option( 'mh_prep_receptions' );
 
+	/*
+	 * Fournisseurs. `wp_delete_term()` détache chaque produit et purge les lignes
+	 * de relation : c'est justement l'avantage de la taxonomie sur un type de
+	 * contenu, qui laisserait des identifiants pointant dans le vide. La
+	 * taxonomie n'est plus enregistrée à cet instant — le plugin est désactivé —
+	 * d'où la déclaration minimale avant suppression, sans laquelle
+	 * `wp_delete_term()` refuserait de travailler.
+	 */
+	if ( ! taxonomy_exists( 'rsmw_supplier' ) ) {
+		register_taxonomy( 'rsmw_supplier', array( 'product' ), array( 'public' => false ) );
+	}
+
+	$rsmw_supplier_terms = get_terms(
+		array(
+			'taxonomy'   => 'rsmw_supplier',
+			'hide_empty' => false,
+			'fields'     => 'ids',
+		)
+	);
+
+	if ( ! is_wp_error( $rsmw_supplier_terms ) ) {
+		foreach ( (array) $rsmw_supplier_terms as $rsmw_term_id ) {
+			wp_delete_term( (int) $rsmw_term_id, 'rsmw_supplier' );
+		}
+	}
+
 	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- désinstallation ponctuelle.
 	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_mh_stock_reel' ) );
 	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => '_rsmw_stock_ordered' ) );

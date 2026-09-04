@@ -20,6 +20,19 @@ $rsmw_allocatable = (int) $data['allocatable'];
 $rsmw_cache_meta  = (array) $data['cache_meta'];
 $rsmw_outside     = (array) $data['outside'];
 $rsmw_status_list = implode( ', ', $rsmw_statuses );
+
+$rsmw_tab        = (string) $data['tab'];
+$rsmw_tabs       = (array) $data['tabs'];
+$rsmw_supplier   = $data['supplier'];
+$rsmw_simulation = $data['simulation'];
+$rsmw_purchase   = $data['purchase'];
+$rsmw_submitted  = (array) $data['submitted'];
+
+// L'onglet « Général » montre tout : c'est le seul où la colonne Fournisseur a un
+// sens, et le seul où il ne faut PAS proposer de saisir une commande — on ne
+// commande pas à plusieurs fournisseurs d'un même geste.
+$rsmw_is_all = \RSMW\Preparation\Admin\NeedsPage::TAB_ALL === $rsmw_tab;
+$rsmw_orphan = \RSMW\Preparation\Admin\NeedsPage::TAB_NONE === $rsmw_tab;
 ?>
 <div class="wrap woocommerce rsmw-wrap">
 
@@ -27,10 +40,37 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 	<a href="<?php echo esc_url( $data['stock_page_url'] ); ?>" class="page-title-action">
 		<?php esc_html_e( 'Gestion du stock', 'real-stock-manager-for-woocommerce' ); ?>
 	</a>
+	<a href="<?php echo esc_url( $data['suppliers_url'] ); ?>" class="page-title-action">
+		<?php esc_html_e( 'Fournisseurs', 'real-stock-manager-for-woocommerce' ); ?>
+	</a>
 	<hr class="wp-header-end">
 
+	<nav class="nav-tab-wrapper woo-nav-tab-wrapper">
+		<?php foreach ( $rsmw_tabs as $rsmw_slug => $rsmw_meta ) : ?>
+			<a href="<?php echo esc_url( \RSMW\Preparation\Admin\NeedsPage::tab_url( (string) $rsmw_slug ) ); ?>"
+				class="nav-tab <?php echo $rsmw_tab === (string) $rsmw_slug ? 'nav-tab-active' : ''; ?>">
+				<?php echo esc_html( $rsmw_meta['label'] ); ?>
+				<span class="count rsmw-tab-count <?php echo ! empty( $rsmw_meta['alert'] ) ? 'rsmw-tab-count--alert' : ''; ?>">
+					<?php echo esc_html( number_format_i18n( (int) $rsmw_meta['count'] ) ); ?>
+				</span>
+			</a>
+		<?php endforeach; ?>
+	</nav>
+
 	<p class="description">
-		<?php esc_html_e( 'Ce qu’il reste à préparer sur les commandes en attente, face à votre stock physique libre. Le stock libre est celui qui n’est encore affecté à aucune commande.', 'real-stock-manager-for-woocommerce' ); ?>
+		<?php if ( $rsmw_supplier ) : ?>
+			<?php
+			printf(
+				/* translators: %s: nom du fournisseur. */
+				esc_html__( 'Ce qu’il reste à commander chez %s. Les compteurs ci-dessous ne portent que sur ce fournisseur.', 'real-stock-manager-for-woocommerce' ),
+				'<strong>' . esc_html( $rsmw_supplier->name ) . '</strong>'
+			);
+			?>
+		<?php elseif ( $rsmw_orphan ) : ?>
+			<?php esc_html_e( 'Références sans fournisseur désigné. Tant qu’elles sont ici, elles n’apparaissent dans aucun onglet fournisseur : ouvrez la fiche produit pour leur en attribuer un.', 'real-stock-manager-for-woocommerce' ); ?>
+		<?php else : ?>
+			<?php esc_html_e( 'Ce qu’il reste à préparer sur les commandes en attente, face à votre stock physique libre. Le stock libre est celui qui n’est encore affecté à aucune commande.', 'real-stock-manager-for-woocommerce' ); ?>
+		<?php endif; ?>
 	</p>
 
 	<?php if ( ! empty( $rsmw_unknown ) ) : ?>
@@ -261,7 +301,19 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 
 	<div class="rsmw-card">
 		<div class="rsmw-card__header">
-			<h2 class="rsmw-card__title"><?php esc_html_e( 'Références à préparer', 'real-stock-manager-for-woocommerce' ); ?></h2>
+			<h2 class="rsmw-card__title">
+				<?php if ( $rsmw_supplier ) : ?>
+					<?php
+					printf(
+						/* translators: %s: nom du fournisseur. */
+						esc_html__( 'Commande à passer chez %s', 'real-stock-manager-for-woocommerce' ),
+						esc_html( $rsmw_supplier->name )
+					);
+					?>
+				<?php else : ?>
+					<?php esc_html_e( 'Références à préparer', 'real-stock-manager-for-woocommerce' ); ?>
+				<?php endif; ?>
+			</h2>
 
 			<div class="rsmw-toolbar">
 				<label class="screen-reader-text" for="mh-search"><?php esc_html_e( 'Rechercher une référence', 'real-stock-manager-for-woocommerce' ); ?></label>
@@ -269,13 +321,41 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 				<?php /* Coché d'entrée : la page sert d'abord à savoir quoi commander. Le script applique le filtre au chargement, sans quoi la case serait cochée devant un tableau complet. */ ?>
 				<label><input type="checkbox" id="mh-only-lack" checked> <?php esc_html_e( 'Manquants uniquement', 'real-stock-manager-for-woocommerce' ); ?></label>
 				<label><input type="checkbox" id="mh-only-stock"> <?php esc_html_e( 'Avec stock libre', 'real-stock-manager-for-woocommerce' ); ?></label>
-				<a class="button" id="mh-export" href="#" data-filename="<?php esc_attr_e( 'besoins-stock', 'real-stock-manager-for-woocommerce' ); ?>">
+				<?php /* Deux formats de copie : le marchand commande par e-mail chez les uns, par portail ou tableur chez les autres. */ ?>
+				<button type="button" class="button" id="rsmw-copy-text"
+					data-done="<?php esc_attr_e( 'Copié !', 'real-stock-manager-for-woocommerce' ); ?>">
+					<?php esc_html_e( 'Copier pour un e-mail', 'real-stock-manager-for-woocommerce' ); ?>
+				</button>
+				<button type="button" class="button" id="rsmw-copy-cells"
+					data-done="<?php esc_attr_e( 'Copié !', 'real-stock-manager-for-woocommerce' ); ?>">
+					<?php esc_html_e( 'Copier pour un tableur', 'real-stock-manager-for-woocommerce' ); ?>
+				</button>
+				<a class="button" id="mh-export" href="#" data-filename="<?php echo esc_attr( $data['export_filename'] ); ?>">
 					<?php esc_html_e( 'Exporter en CSV', 'real-stock-manager-for-woocommerce' ); ?>
 				</a>
 			</div>
 		</div>
 
-		<?php if ( empty( $rsmw_rows ) ) : ?>
+		<?php if ( empty( $rsmw_rows ) && $rsmw_supplier ) : ?>
+			<?php /* Vide INTENTIONNEL : le serveur sait que ce fournisseur n'a rien, il le dit. Le message générique du filtre laisserait croire à une erreur de recherche. */ ?>
+			<div class="rsmw-card__body">
+				<div class="rsmw-empty">
+					<?php
+					printf(
+						/* translators: %s: nom du fournisseur. */
+						esc_html__( 'Rien à commander chez %s pour l’instant.', 'real-stock-manager-for-woocommerce' ),
+						'<strong>' . esc_html( $rsmw_supplier->name ) . '</strong>'
+					);
+					?>
+				</div>
+			</div>
+		<?php elseif ( empty( $rsmw_rows ) && $rsmw_orphan ) : ?>
+			<div class="rsmw-card__body">
+				<div class="rsmw-empty">
+					<?php esc_html_e( 'Toutes vos références ont un fournisseur. Cet onglet disparaîtra au prochain chargement.', 'real-stock-manager-for-woocommerce' ); ?>
+				</div>
+			</div>
+		<?php elseif ( empty( $rsmw_rows ) ) : ?>
 			<div class="rsmw-card__body">
 				<div class="rsmw-empty">
 					<?php
@@ -290,11 +370,17 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 				</div>
 			</div>
 		<?php else : ?>
+			<form method="post">
+			<?php wp_nonce_field( $data['purchase_nonce'] ); ?>
 			<div class="rsmw-card__body rsmw-card__body--flush">
 				<table class="rsmw-table" id="mh-table">
 					<thead>
 						<tr>
 							<th data-key="name"><?php esc_html_e( 'Référence', 'real-stock-manager-for-woocommerce' ); ?></th>
+							<?php if ( $rsmw_is_all ) : ?>
+								<?php /* Filet de sécurité : dans Général, rien ne peut se cacher. Une référence sans fournisseur se voit d'un coup d'œil. */ ?>
+								<th data-key="fournisseur"><?php esc_html_e( 'Fournisseur', 'real-stock-manager-for-woocommerce' ); ?></th>
+							<?php endif; ?>
 							<th class="rsmw-num" data-key="demande"><?php esc_html_e( 'Demandé', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<th class="rsmw-num" data-key="pointe"><?php esc_html_e( 'Déjà pointé', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<th class="rsmw-num" data-key="restant"><?php esc_html_e( 'Reste à préparer', 'real-stock-manager-for-woocommerce' ); ?></th>
@@ -303,6 +389,9 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 							<th class="rsmw-num" data-key="manque"><?php esc_html_e( 'Reste à commander', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<th class="rsmw-num" data-key="commandes"><?php esc_html_e( 'Commandes', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<th><?php esc_html_e( 'Plus ancienne', 'real-stock-manager-for-woocommerce' ); ?></th>
+							<?php if ( $rsmw_supplier ) : ?>
+								<th class="rsmw-num"><?php esc_html_e( 'À commander', 'real-stock-manager-for-woocommerce' ); ?></th>
+							<?php endif; ?>
 						</tr>
 					</thead>
 					<tbody>
@@ -311,9 +400,15 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 						// remove_accents() AVANT strtolower() : strtolower() ne traite que
 						// l'ASCII, un « É » initial y survivrait puis deviendrait un « E »
 						// majuscule, introuvable par une recherche en minuscules.
-						$rsmw_search = strtolower( remove_accents( $rsmw_row['name'] . ' ' . $rsmw_row['variant'] . ' ' . $rsmw_row['sku'] ) );
+						// Le fournisseur entre dans la chaîne de recherche : dans l'onglet
+						// Général, taper son nom filtre le tableau. C'est le repli naturel
+						// quand il y a trop de fournisseurs pour la barre d'onglets.
+						$rsmw_search = strtolower( remove_accents( $rsmw_row['name'] . ' ' . $rsmw_row['variant'] . ' ' . $rsmw_row['sku'] . ' ' . $rsmw_row['fournisseur'] ) );
 						?>
-						<tr data-search="<?php echo esc_attr( $rsmw_search ); ?>"
+						<tr data-id="<?php echo esc_attr( (string) $rsmw_row['id'] ); ?>"
+							data-fournisseur="<?php echo esc_attr( $rsmw_row['fournisseur'] ); ?>"
+							data-sku="<?php echo esc_attr( $rsmw_row['sku'] ); ?>"
+							data-search="<?php echo esc_attr( $rsmw_search ); ?>"
 							data-name="<?php echo esc_attr( trim( $rsmw_row['name'] . ' ' . $rsmw_row['variant'] ) ); ?>"
 							data-demande="<?php echo esc_attr( (string) $rsmw_row['demande'] ); ?>"
 							data-pointe="<?php echo esc_attr( (string) $rsmw_row['pointe'] ); ?>"
@@ -324,7 +419,12 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 							data-commandes="<?php echo esc_attr( (string) $rsmw_row['commandes'] ); ?>"
 							data-valeur="<?php echo esc_attr( (string) $rsmw_row['valeur'] ); ?>">
 							<td>
-								<strong><?php echo esc_html( $rsmw_row['name'] ); ?></strong>
+								<?php /* Le nom lie vers la fiche produit : c'est ce qui transforme l'onglet « Sans fournisseur » en liste de travail plutôt qu'en liste de reproches. */ ?>
+								<?php if ( '' !== $rsmw_row['edit'] ) : ?>
+									<strong><a href="<?php echo esc_url( $rsmw_row['edit'] ); ?>"><?php echo esc_html( $rsmw_row['name'] ); ?></a></strong>
+								<?php else : ?>
+									<strong><?php echo esc_html( $rsmw_row['name'] ); ?></strong>
+								<?php endif; ?>
 								<?php if ( '' !== $rsmw_row['variant'] ) : ?>
 									<span class="rsmw-variant"> — <?php echo esc_html( $rsmw_row['variant'] ); ?></span>
 								<?php endif; ?>
@@ -332,6 +432,15 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 									<br><span class="rsmw-sku"><?php echo esc_html( $rsmw_row['sku'] ); ?></span>
 								<?php endif; ?>
 							</td>
+							<?php if ( $rsmw_is_all ) : ?>
+								<td>
+									<?php if ( '' !== $rsmw_row['fournisseur'] ) : ?>
+										<?php echo esc_html( $rsmw_row['fournisseur'] ); ?>
+									<?php else : ?>
+										<span class="rsmw-lack">—</span>
+									<?php endif; ?>
+								</td>
+							<?php endif; ?>
 							<td class="rsmw-num">
 								<?php echo $rsmw_row['demande'] ? esc_html( (string) $rsmw_row['demande'] ) : '<span class="rsmw-zero">·</span>'; ?>
 							</td>
@@ -361,6 +470,24 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 									<span class="rsmw-zero">·</span>
 								<?php endif; ?>
 							</td>
+							<?php if ( $rsmw_supplier ) : ?>
+								<td class="rsmw-num">
+									<?php
+									// Prérempli avec le manque : le geste par défaut est de
+									// commander ce qui manque, et mettre zéro suffit à écarter
+									// une ligne. Une case à cocher ajouterait une décision que
+									// le marchand n'a pas à prendre.
+									$rsmw_qty = isset( $rsmw_submitted[ $rsmw_row['id'] ] )
+										? (int) $rsmw_submitted[ $rsmw_row['id'] ]
+										: (int) $rsmw_row['manque'];
+									?>
+									<input type="number" class="rsmw-field__input--qty"
+										name="rsmw_purchase[<?php echo esc_attr( (string) $rsmw_row['id'] ); ?>]"
+										value="<?php echo esc_attr( (string) $rsmw_qty ); ?>"
+										min="0" step="1" inputmode="numeric"
+										aria-label="<?php esc_attr_e( 'Quantité à commander', 'real-stock-manager-for-woocommerce' ); ?>">
+								</td>
+							<?php endif; ?>
 						</tr>
 					<?php endforeach; ?>
 					</tbody>
@@ -369,8 +496,97 @@ $rsmw_status_list = implode( ', ', $rsmw_statuses );
 					<?php esc_html_e( 'Aucune référence ne correspond à ce filtre.', 'real-stock-manager-for-woocommerce' ); ?>
 				</div>
 			</div>
+
+			<?php if ( $rsmw_supplier ) : ?>
+				<div class="rsmw-card__footer">
+					<button type="submit" name="rsmw_purchase_check" value="1" class="button button-primary">
+						<?php esc_html_e( 'Vérifier la commande', 'real-stock-manager-for-woocommerce' ); ?>
+					</button>
+					<span class="rsmw-field__hint">
+						<?php esc_html_e( 'Rien ne sera écrit : vous verrez d’abord l’effet sur vos commandes clients.', 'real-stock-manager-for-woocommerce' ); ?>
+					</span>
+				</div>
+			<?php endif; ?>
+			</form>
 		<?php endif; ?>
 	</div>
+
+	<?php if ( is_array( $rsmw_simulation ) && ! empty( $rsmw_simulation['lines'] ) ) : ?>
+		<div class="rsmw-card rsmw-card--dry">
+			<div class="rsmw-card__header">
+				<h2 class="rsmw-card__title"><?php esc_html_e( 'Vérification — rien n’a été enregistré', 'real-stock-manager-for-woocommerce' ); ?></h2>
+			</div>
+			<div class="rsmw-card__body">
+				<p class="rsmw-report__figure">
+					<?php
+					printf(
+						/* translators: 1: nombre d'articles, 2: nombre de références, 3: valeur. */
+						esc_html__( '%1$s article(s) seraient enregistrés en commande, sur %2$s référence(s), pour %3$s.', 'real-stock-manager-for-woocommerce' ),
+						'<strong>' . esc_html( number_format_i18n( (int) $rsmw_simulation['qty_total'] ) ) . '</strong>',
+						'<strong>' . esc_html( number_format_i18n( (int) $rsmw_simulation['references'] ) ) . '</strong>',
+						'<strong>' . wp_kses_post( wc_price( (float) $rsmw_simulation['value_total'] ) ) . '</strong>'
+					);
+					?>
+					<br>
+					<?php
+					printf(
+						/* translators: 1: quantité réservée, 2: quantité laissée disponible. */
+						esc_html__( '%1$s seraient réservés sur des commandes clients en attente, %2$s resteraient disponibles pour les prochaines.', 'real-stock-manager-for-woocommerce' ),
+						'<strong>' . esc_html( number_format_i18n( (int) $rsmw_simulation['covers_total'] ) ) . '</strong>',
+						'<strong>' . esc_html( number_format_i18n( (int) $rsmw_simulation['free_total'] ) ) . '</strong>'
+					);
+					?>
+				</p>
+
+				<?php foreach ( (array) $rsmw_simulation['warnings'] as $rsmw_warning ) : ?>
+					<p class="rsmw-lack">⚠ <?php echo esc_html( $rsmw_warning ); ?></p>
+				<?php endforeach; ?>
+			</div>
+			<div class="rsmw-card__footer">
+				<form method="post">
+					<?php wp_nonce_field( $data['purchase_nonce'] ); ?>
+					<?php foreach ( $rsmw_simulation['lines'] as $rsmw_line ) : ?>
+						<input type="hidden" name="rsmw_purchase[<?php echo esc_attr( (string) $rsmw_line['id'] ); ?>]"
+							value="<?php echo esc_attr( (string) $rsmw_line['qty'] ); ?>">
+					<?php endforeach; ?>
+					<button type="submit" name="rsmw_purchase_submit" value="1" class="button button-primary">
+						<?php esc_html_e( 'Enregistrer la commande fournisseur', 'real-stock-manager-for-woocommerce' ); ?>
+					</button>
+				</form>
+			</div>
+		</div>
+	<?php endif; ?>
+
+	<?php if ( is_array( $rsmw_purchase ) && ! empty( $rsmw_purchase['lines'] ) ) : ?>
+		<div class="rsmw-card rsmw-card--report rsmw-card--report-ordered">
+			<div class="rsmw-card__header">
+				<h2 class="rsmw-card__title"><?php esc_html_e( 'Commande fournisseur enregistrée', 'real-stock-manager-for-woocommerce' ); ?></h2>
+			</div>
+			<div class="rsmw-card__body">
+				<p class="rsmw-report__figure">
+					<?php
+					printf(
+						/* translators: 1: nombre d'articles, 2: nombre de références, 3: quantité réservée. */
+						esc_html__( '%1$s article(s) enregistrés sur %2$s référence(s). %3$s ont été réservés sur des commandes clients.', 'real-stock-manager-for-woocommerce' ),
+						'<strong>' . esc_html( number_format_i18n( (int) $rsmw_purchase['qty_total'] ) ) . '</strong>',
+						'<strong>' . esc_html( number_format_i18n( (int) $rsmw_purchase['references'] ) ) . '</strong>',
+						'<strong>' . esc_html( number_format_i18n( (int) $rsmw_purchase['covers_total'] ) ) . '</strong>'
+					);
+					?>
+				</p>
+
+				<?php if ( ! empty( $rsmw_purchase['orders'] ) ) : ?>
+					<p>
+						<?php esc_html_e( 'Commandes clients concernées :', 'real-stock-manager-for-woocommerce' ); ?>
+						<?php foreach ( $rsmw_purchase['orders'] as $rsmw_index => $rsmw_order ) : ?>
+							<?php echo $rsmw_index > 0 ? ' &middot; ' : ''; ?>
+							<a href="<?php echo esc_url( $rsmw_order['url'] ); ?>">#<?php echo esc_html( $rsmw_order['num'] ); ?></a>
+						<?php endforeach; ?>
+					</p>
+				<?php endif; ?>
+			</div>
+		</div>
+	<?php endif; ?>
 
 	<div class="rsmw-card">
 		<div class="rsmw-card__header">
