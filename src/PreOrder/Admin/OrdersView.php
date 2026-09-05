@@ -117,6 +117,10 @@ final class OrdersView {
 	public static function filter_hpos_query( $args ) {
 		$view = self::current_view();
 
+		if ( '' === $view ) {
+			return $args;
+		}
+
 		if ( self::VIEW_TODO === $view ) {
 			$args['status'] = Config::statuses();
 		} elseif ( self::VIEW_PREORDERS === $view ) {
@@ -129,6 +133,32 @@ final class OrdersView {
 				'compare' => 'EXISTS',
 			);
 		}
+
+		/*
+		 * SANS CETTE LIGNE, LA PAGINATION MENT.
+		 *
+		 * WooCommerce nous passe une COPIE de ses arguments de requête. La liste
+		 * interroge bien la copie filtrée — le tableau affiche donc les bonnes
+		 * commandes — mais son comptage, lui, relit l'objet d'origine :
+		 * ListTable::get_max_num_pages() appelle count_orders_by_status() sur
+		 * `$this->order_query_args['status']`, où notre filtre n'a jamais été
+		 * appliqué. Le total et le nombre de pages sont alors ceux de TOUS les
+		 * statuts.
+		 *
+		 * Ce chemin de comptage approché n'est emprunté que si la requête n'emploie
+		 * aucun argument sortant d'une courte liste (limit, page, paginate, type,
+		 * status, orderby, order). `no_found_rows` n'en fait pas partie : le poser
+		 * suffit à écarter le raccourci, et WooCommerce compte alors réellement les
+		 * lignes de la requête filtrée.
+		 *
+		 * La vue « Précommandes » y échappait déjà par accident, sa `meta_query`
+		 * jouant le même rôle. On rend la chose explicite pour les deux, plutôt que
+		 * de dépendre d'un effet de bord.
+		 *
+		 * Coût : une requête de comptage, celle que WooCommerce exécute de toute
+		 * façon dès qu'un filtre de recherche, de client ou de date est appliqué.
+		 */
+		$args['no_found_rows'] = false;
 
 		return $args;
 	}

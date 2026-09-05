@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.1
+Stable tag: 1.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,11 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 1.1.2 =
+* Correctif : dans la vue « À traiter » de la liste des commandes, le nombre total d’éléments et le nombre de pages étaient ceux de TOUTES les commandes, pas celles de la vue. Le tableau affichait bien les bonnes commandes, mais la pagination annonçait des pages qui n’existaient pas.
+* Cause : WooCommerce transmet aux extensions une copie de ses arguments de requête. La liste interroge la copie filtrée, mais son comptage relit l’objet d’origine, où le filtre n’a jamais été appliqué. Ce raccourci de comptage n’est emprunté que si la requête n’emploie que des arguments standard ; la vue emploie désormais un argument qui l’écarte, et WooCommerce compte réellement les lignes de la requête filtrée.
+* La vue « Précommandes » n’était pas touchée : son filtre par méta écartait déjà ce raccourci. Les deux vues le font maintenant explicitement, plutôt que de dépendre d’un effet de bord.
 
 = 1.1.1 =
 * Le tableau de « Besoins & stock » ne déborde plus de l’écran. Les gouttières des cellules passent de 24 à 10 pixels — avec dix colonnes, elles consommaient à elles seules près de 500 pixels — et les 24 pixels sont conservés aux deux extrémités.
@@ -152,6 +157,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 1.1.2 =
+Corrige la pagination de la vue « À traiter », qui annonçait bien plus de commandes et de pages qu’il n’en existait. Aucune donnée n’est modifiée.
 
 = 1.1.1 =
 Mise en page du tableau « Besoins & stock ». Aucune donnée ni aucun comportement n’est modifié.
