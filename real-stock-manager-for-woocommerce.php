@@ -3,7 +3,7 @@
  * Plugin Name:          Real Stock Manager for WooCommerce
  * Plugin URI:           https://github.com/benoitbonavia/real-stock-manager-for-woocommerce
  * Description:          Centralise la gestion des stocks réels de WooCommerce : règles, automatismes et outils regroupés dans un plugin unique plutôt que dans des snippets épars.
- * Version:              1.1.0
+ * Version:              1.1.1
  * Requires at least:    6.8
  * Requires PHP:         7.4
  * Requires Plugins:     woocommerce
@@ -24,7 +24,7 @@ namespace RSMW;
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'RSMW_VERSION', '1.1.0' );
+define( 'RSMW_VERSION', '1.1.1' );
 define( 'RSMW_FILE', __FILE__ );
 define( 'RSMW_PATH', plugin_dir_path( __FILE__ ) );
 define( 'RSMW_URL', plugin_dir_url( __FILE__ ) );

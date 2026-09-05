@@ -353,17 +353,49 @@
 	border-collapse: collapse;
 }
 
+/*
+ * Gouttières de 10px, et non 24px.
+ *
+ * La page « Besoins & stock » compte jusqu'à dix colonnes depuis l'arrivée du
+ * fournisseur et du champ de commande. À 24px de chaque côté, les seules marges
+ * consommaient près de 500px — le tableau débordait de l'écran avant d'avoir
+ * affiché un chiffre. Les 24px sont conservés aux deux extrémités, pour que le
+ * contenu ne colle pas au bord de la carte.
+ */
 .rsmw-table th {
 	text-align: left;
 	font-size: 11px;
 	text-transform: uppercase;
 	letter-spacing: .04em;
 	color: var(--rsmw-text-muted);
-	padding: 10px 24px;
+	padding: 10px;
 	border-bottom: 1px solid var(--rsmw-border);
 	background: #fafafa;
 	white-space: nowrap;
 	font-weight: 600;
+	vertical-align: bottom;
+}
+
+.rsmw-table th:first-child,
+.rsmw-table td:first-child {
+	padding-left: 24px;
+}
+
+.rsmw-table th:last-child,
+.rsmw-table td:last-child {
+	padding-right: 24px;
+}
+
+/*
+ * Les en-têtes de colonnes chiffrées passent sur deux lignes plutôt que
+ * d'imposer leur longueur à toute la colonne : « Reste à commander » sur une
+ * seule ligne réservait à lui seul 130px pour afficher des nombres à deux
+ * chiffres.
+ */
+.rsmw-table th.rsmw-num {
+	white-space: normal;
+	max-width: 92px;
+	line-height: 1.3;
 }
 
 .rsmw-table th[data-key] {
@@ -384,7 +416,7 @@
 }
 
 .rsmw-table td {
-	padding: 12px 24px;
+	padding: 12px 10px;
 	border-bottom: 1px solid var(--rsmw-border-soft);
 	vertical-align: middle;
 	font-size: 13px;
@@ -651,4 +683,79 @@
 
 .rsmw-supplier-filter .rsmw-field__hint {
 	flex: 1 1 260px;
+}
+
+/* Tableau des besoins : tenir dans la largeur ------------------------------ */
+
+/*
+ * Filet de sécurité. Les colonnes ci-dessous sont dimensionnées pour tenir dans
+ * les 1220px du conteneur, mais une police système plus large ou un nom de
+ * fournisseur à rallonge peuvent encore déborder. Plutôt que de laisser le
+ * tableau pousser toute la page — barre de défilement horizontale sur
+ * l'administration entière, en-têtes qui sortent de l'écran — on confine le
+ * débordement à la carte.
+ */
+.rsmw-card__body--flush {
+	overflow-x: auto;
+}
+
+/* La colonne « Référence » absorbe la place restante ; c'est la seule dont le
+   contenu est du texte libre et mérite de respirer. */
+.rsmw-table th:first-child {
+	width: 100%;
+	min-width: 240px;
+}
+
+/*
+ * Un nom de fournisseur long ne doit pas repousser les chiffres hors de l'écran.
+ * Le nom complet reste lisible au survol, et la recherche continue de le trouver
+ * puisqu'elle lit data-search, pas la cellule.
+ */
+.rsmw-table .rsmw-supplier-cell {
+	max-width: 150px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Colonne « Plus ancienne » : le numéro et la date empilés plutôt que côte à
+   côte, et l'en-tête libre de passer sur deux lignes — en une seule, il imposait
+   112px à une colonne dont le contenu en demande 60. */
+.rsmw-table th.rsmw-oldest {
+	white-space: normal;
+	max-width: 80px;
+	line-height: 1.3;
+}
+
+.rsmw-table td.rsmw-oldest {
+	white-space: nowrap;
+}
+
+.rsmw-table td.rsmw-oldest .rsmw-variant {
+	display: block;
+	font-size: 11px;
+}
+
+/* Le champ de saisie de la commande n'a pas besoin d'être large : trois chiffres
+   suffisent, et chaque pixel gagné ici revient à la colonne Référence. */
+.rsmw-table td .rsmw-field__input--qty {
+	max-width: 74px;
+}
+
+/*
+ * Sous 1200px, les colonnes les plus dispensables s'effacent : « Demandé » et
+ * « Déjà pointé » se déduisent de « Reste à préparer », et « Commandes » est un
+ * indice de contexte, pas une donnée d'action. Rien n'est perdu — le tri,
+ * l'export CSV et les indicateurs lisent les attributs data-* de la LIGNE, pas
+ * les cellules affichées.
+ *
+ * Marquées par une classe et non par leur rang : la position des colonnes change
+ * entre l'onglet « Général », qui porte le fournisseur, et un onglet fournisseur,
+ * qui porte le champ de commande. Une règle en nth-child masquerait la mauvaise
+ * colonne dans l'un des deux.
+ */
+@media screen and (max-width: 1200px) {
+	.rsmw-table .rsmw-col-secondary {
+		display: none;
+	}
 }

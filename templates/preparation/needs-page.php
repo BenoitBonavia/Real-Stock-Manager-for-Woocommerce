@@ -381,14 +381,39 @@ $rsmw_orphan = \RSMW\Preparation\Admin\NeedsPage::TAB_NONE === $rsmw_tab;
 								<?php /* Filet de sécurité : dans Général, rien ne peut se cacher. Une référence sans fournisseur se voit d'un coup d'œil. */ ?>
 								<th data-key="fournisseur"><?php esc_html_e( 'Fournisseur', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<?php endif; ?>
-							<th class="rsmw-num" data-key="demande"><?php esc_html_e( 'Demandé', 'real-stock-manager-for-woocommerce' ); ?></th>
-							<th class="rsmw-num" data-key="pointe"><?php esc_html_e( 'Déjà pointé', 'real-stock-manager-for-woocommerce' ); ?></th>
-							<th class="rsmw-num" data-key="restant"><?php esc_html_e( 'Reste à préparer', 'real-stock-manager-for-woocommerce' ); ?></th>
-							<th class="rsmw-num" data-key="libre"><?php esc_html_e( 'Stock libre', 'real-stock-manager-for-woocommerce' ); ?></th>
-							<th class="rsmw-num" data-key="commande"><?php esc_html_e( 'En commande', 'real-stock-manager-for-woocommerce' ); ?></th>
-							<th class="rsmw-num" data-key="manque"><?php esc_html_e( 'Reste à commander', 'real-stock-manager-for-woocommerce' ); ?></th>
-							<th class="rsmw-num" data-key="commandes"><?php esc_html_e( 'Commandes', 'real-stock-manager-for-woocommerce' ); ?></th>
-							<th><?php esc_html_e( 'Plus ancienne', 'real-stock-manager-for-woocommerce' ); ?></th>
+							<?php /* En-têtes courts, libellé complet en infobulle : « Reste à commander » réservait à lui seul 130px pour afficher des nombres à deux chiffres. */ ?>
+							<th class="rsmw-num rsmw-col-secondary" data-key="demande"
+								title="<?php esc_attr_e( 'Quantité demandée par les commandes clients', 'real-stock-manager-for-woocommerce' ); ?>">
+								<?php esc_html_e( 'Demandé', 'real-stock-manager-for-woocommerce' ); ?>
+							</th>
+							<th class="rsmw-num rsmw-col-secondary" data-key="pointe"
+								title="<?php esc_attr_e( 'Déjà pointé sur les commandes', 'real-stock-manager-for-woocommerce' ); ?>">
+								<?php esc_html_e( 'Pointé', 'real-stock-manager-for-woocommerce' ); ?>
+							</th>
+							<th class="rsmw-num" data-key="restant"
+								title="<?php esc_attr_e( 'Reste à préparer', 'real-stock-manager-for-woocommerce' ); ?>">
+								<?php esc_html_e( 'À préparer', 'real-stock-manager-for-woocommerce' ); ?>
+							</th>
+							<th class="rsmw-num" data-key="libre"
+								title="<?php esc_attr_e( 'Stock physique libre, non affecté à une commande', 'real-stock-manager-for-woocommerce' ); ?>">
+								<?php esc_html_e( 'Stock libre', 'real-stock-manager-for-woocommerce' ); ?>
+							</th>
+							<th class="rsmw-num" data-key="commande"
+								title="<?php esc_attr_e( 'Commandé au fournisseur, pas encore reçu', 'real-stock-manager-for-woocommerce' ); ?>">
+								<?php esc_html_e( 'En commande', 'real-stock-manager-for-woocommerce' ); ?>
+							</th>
+							<?php /* « Manque » et non « Reste à commander » : dans un onglet fournisseur, la colonne de saisie voisine s'appelle « À commander ». Deux intitulés proches feraient lire l'un pour l'autre. */ ?>
+							<th class="rsmw-num" data-key="manque"
+								title="<?php esc_attr_e( 'Reste à commander : ni en stock, ni déjà commandé', 'real-stock-manager-for-woocommerce' ); ?>">
+								<?php esc_html_e( 'Manque', 'real-stock-manager-for-woocommerce' ); ?>
+							</th>
+							<th class="rsmw-num rsmw-col-secondary" data-key="commandes"
+								title="<?php esc_attr_e( 'Nombre de commandes clients en attente', 'real-stock-manager-for-woocommerce' ); ?>">
+								<?php esc_html_e( 'Cdes', 'real-stock-manager-for-woocommerce' ); ?>
+							</th>
+							<th class="rsmw-oldest" title="<?php esc_attr_e( 'Commande cliente la plus ancienne en attente', 'real-stock-manager-for-woocommerce' ); ?>">
+								<?php esc_html_e( 'Plus ancienne', 'real-stock-manager-for-woocommerce' ); ?>
+							</th>
 							<?php if ( $rsmw_supplier ) : ?>
 								<th class="rsmw-num"><?php esc_html_e( 'À commander', 'real-stock-manager-for-woocommerce' ); ?></th>
 							<?php endif; ?>
@@ -433,7 +458,7 @@ $rsmw_orphan = \RSMW\Preparation\Admin\NeedsPage::TAB_NONE === $rsmw_tab;
 								<?php endif; ?>
 							</td>
 							<?php if ( $rsmw_is_all ) : ?>
-								<td>
+								<td class="rsmw-supplier-cell" title="<?php echo esc_attr( $rsmw_row['fournisseur'] ); ?>">
 									<?php if ( '' !== $rsmw_row['fournisseur'] ) : ?>
 										<?php echo esc_html( $rsmw_row['fournisseur'] ); ?>
 									<?php else : ?>
@@ -441,10 +466,10 @@ $rsmw_orphan = \RSMW\Preparation\Admin\NeedsPage::TAB_NONE === $rsmw_tab;
 									<?php endif; ?>
 								</td>
 							<?php endif; ?>
-							<td class="rsmw-num">
+							<td class="rsmw-num rsmw-col-secondary">
 								<?php echo $rsmw_row['demande'] ? esc_html( (string) $rsmw_row['demande'] ) : '<span class="rsmw-zero">·</span>'; ?>
 							</td>
-							<td class="rsmw-num">
+							<td class="rsmw-num rsmw-col-secondary">
 								<?php echo $rsmw_row['pointe'] ? esc_html( (string) $rsmw_row['pointe'] ) : '<span class="rsmw-zero">·</span>'; ?>
 							</td>
 							<td class="rsmw-num">
@@ -459,10 +484,10 @@ $rsmw_orphan = \RSMW\Preparation\Admin\NeedsPage::TAB_NONE === $rsmw_tab;
 							<td class="rsmw-num <?php echo $rsmw_row['manque'] > 0 ? 'rsmw-lack' : 'rsmw-full'; ?>">
 								<?php echo $rsmw_row['manque'] > 0 ? esc_html( (string) $rsmw_row['manque'] ) : '✓'; ?>
 							</td>
-							<td class="rsmw-num">
+							<td class="rsmw-num rsmw-col-secondary">
 								<?php echo $rsmw_row['commandes'] ? esc_html( (string) $rsmw_row['commandes'] ) : '<span class="rsmw-zero">·</span>'; ?>
 							</td>
-							<td>
+							<td class="rsmw-oldest">
 								<?php if ( $rsmw_row['oldest'] ) : ?>
 									<a href="<?php echo esc_url( $rsmw_row['oldest']['url'] ); ?>">#<?php echo esc_html( $rsmw_row['oldest']['num'] ); ?></a>
 									<span class="rsmw-variant"><?php echo esc_html( $rsmw_row['oldest']['date'] ); ?></span>

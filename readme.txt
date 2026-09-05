@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,14 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 1.1.1 =
+* Le tableau de « Besoins & stock » ne déborde plus de l’écran. Les gouttières des cellules passent de 24 à 10 pixels — avec dix colonnes, elles consommaient à elles seules près de 500 pixels — et les 24 pixels sont conservés aux deux extrémités.
+* En-têtes raccourcis, libellé complet en infobulle : « Reste à commander » réservait 130 pixels pour afficher des nombres à deux chiffres. Il devient « Manque », ce qui le distingue aussi du champ de saisie « À commander » voisin dans un onglet fournisseur.
+* Les en-têtes des colonnes chiffrées passent sur deux lignes au lieu d’imposer leur longueur à toute la colonne, et le numéro de commande la plus ancienne est empilé sous sa date.
+* Sur un écran étroit, « Demandé », « Pointé » et le nombre de commandes s’effacent : les deux premiers se déduisent de « À préparer », le troisième est un indice de contexte. Le tri, l’export CSV et les indicateurs sont inchangés — ils lisent la ligne, pas les cellules affichées.
+* Un nom de fournisseur long est tronqué avec son nom complet au survol, plutôt que de repousser les chiffres hors de l’écran.
+* Filet de sécurité : si le tableau déborde malgré tout, le défilement horizontal reste confiné à la carte au lieu de décaler toute la page.
 
 = 1.1.0 =
 * Onglet « Réception d’un colis » : un sélecteur « Colis reçu de » filtre les références attendues par fournisseur, avec le nombre attendu chez chacun. On ne pointe plus que ce que le colis peut contenir.
@@ -144,6 +152,9 @@ La vérification automatique a lieu au plus toutes les 12 heures.
 * Mises à jour automatiques depuis GitHub.
 
 == Upgrade Notice ==
+
+= 1.1.1 =
+Mise en page du tableau « Besoins & stock ». Aucune donnée ni aucun comportement n’est modifié.
 
 = 1.1.0 =
 Filtre par fournisseur sur la réception de colis. Aucune donnée n’est modifiée. Si vous aviez déjà créé un fournisseur nommé « Général » ou « Sans fournisseur », renommez-le : son slug entrait en conflit avec les filtres du plugin.
