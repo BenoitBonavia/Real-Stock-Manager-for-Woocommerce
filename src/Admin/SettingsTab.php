@@ -17,6 +17,7 @@ use RSMW\PreOrder\SnippetGuard as PreOrderSnippetGuard;
 use RSMW\Preparation\Config;
 use RSMW\Suppliers\Resolver as SupplierResolver;
 use RSMW\Suppliers\Taxonomy as SupplierTaxonomy;
+use RSMW\Preparation\Cost;
 use RSMW\Preparation\Defects;
 use RSMW\Preparation\Items;
 use RSMW\Preparation\Journal;
@@ -301,6 +302,24 @@ final class SettingsTab extends \WC_Settings_Page {
 			'<strong>' . esc_html( number_format_i18n( Supply::tracked_reference_count() ) ) . '</strong>',
 			'<strong>' . esc_html( number_format_i18n( Items::ordered_line_count() ) ) . '</strong>'
 		);
+
+		/*
+		 * Sans cette ligne, la valeur d'achat affichée sur « Gestion du stock »
+		 * resterait un tiret muet : rien n'expliquerait pourquoi, ni comment
+		 * l'activer.
+		 */
+		if ( Cost::SOURCE_NONE === Cost::source() ) {
+			$lines[] = '<strong style="color:#b32d2e">'
+				. esc_html__( 'Source du coût d’achat : aucune. La valeur d’achat du stock ne peut pas être calculée.', 'real-stock-manager-for-woocommerce' )
+				. '</strong> '
+				. esc_html__( 'Activez « Cost of Goods Sold » dans WooCommerce → Réglages → Avancé → Fonctionnalités, ou installez le plugin gratuit « Cost of Goods for WooCommerce ».', 'real-stock-manager-for-woocommerce' );
+		} else {
+			$lines[] = sprintf(
+				/* translators: %s: nom de la source de coût détectée. */
+				esc_html__( 'Source du coût d’achat : %s.', 'real-stock-manager-for-woocommerce' ),
+				'<span style="color:#00a32a">' . esc_html( Cost::source_label() ) . '</span>'
+			);
+		}
 
 		$lines[] = sprintf(
 			/* translators: 1: nombre de références, 2: nombre total d'articles. */

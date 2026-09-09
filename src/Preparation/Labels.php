@@ -19,7 +19,7 @@ final class Labels {
 	 *
 	 * @param int $product_id Produit ou variation.
 	 *
-	 * @return array{name:string, variant:string, sku:string, price:float, edit:string}
+	 * @return array{name:string, variant:string, sku:string, price:float, cost:float, edit:string}
 	 */
 	public static function get( $product_id ): array {
 		$product_id = (int) $product_id;
@@ -35,6 +35,7 @@ final class Labels {
 				'variant' => '',
 				'sku'     => '',
 				'price'   => 0.0,
+				'cost'    => 0.0,
 				'edit'    => '',
 			);
 		}
@@ -56,6 +57,7 @@ final class Labels {
 			'variant' => (string) $variant,
 			'sku'     => (string) $product->get_sku(),
 			'price'   => (float) $product->get_price(),
+			'cost'    => Cost::for_product( $product ),
 			'edit'    => (string) get_edit_post_link( $edit_id, '' ),
 		);
 	}

@@ -14,6 +14,7 @@ use RSMW\Preparation\Legacy;
 use RSMW\Preparation\Reception;
 use RSMW\Preparation\Stock;
 use RSMW\Preparation\Supply;
+use RSMW\Preparation\Valuation;
 use RSMW\Suppliers\Resolver;
 
 defined( 'ABSPATH' ) || exit;
@@ -224,6 +225,7 @@ final class StockPage {
 				'nonce_field'    => wp_nonce_field( self::NONCE_RECEPTION, '_wpnonce', true, false ),
 				'journal'        => Journal::all(),
 				'needs_page_url' => admin_url( 'admin.php?page=' . Legacy::PAGE_NEEDS ),
+				'valuation'      => Valuation::compute(),
 			)
 		);
 	}

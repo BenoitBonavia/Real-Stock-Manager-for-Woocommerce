@@ -182,6 +182,7 @@ $rsmw_choices       = (array) $data['supplier_list'];
 				</div>
 			</div>
 		</div>
+		<?php View::render( 'valuation-kpis', array( 'valuation' => $data['valuation'] ) ); ?>
 	<?php elseif ( empty( $rsmw_pending ) ) : ?>
 		<div class="rsmw-card">
 			<div class="rsmw-card__body">
@@ -194,6 +195,7 @@ $rsmw_choices       = (array) $data['supplier_list'];
 				</div>
 			</div>
 		</div>
+		<?php View::render( 'valuation-kpis', array( 'valuation' => $data['valuation'] ) ); ?>
 	<?php else : ?>
 
 		<form method="post" id="rsmw-reception-form">
@@ -267,6 +269,8 @@ $rsmw_choices       = (array) $data['supplier_list'];
 					<div class="rsmw-kpi__value" id="rsmw-k-remaining">0</div>
 				</div>
 			</div>
+
+			<?php View::render( 'valuation-kpis', array( 'valuation' => $data['valuation'] ) ); ?>
 
 			<div class="rsmw-card" id="rsmw-reception">
 				<div class="rsmw-card__header">

@@ -346,6 +346,13 @@
 	color: var(--rsmw-negative);
 }
 
+.rsmw-kpi__sub {
+	font-size: 12px;
+	color: var(--rsmw-text-muted);
+	margin-top: 4px;
+	font-variant-numeric: tabular-nums;
+}
+
 /* Tableaux --------------------------------------------------------------- */
 
 .rsmw-table {

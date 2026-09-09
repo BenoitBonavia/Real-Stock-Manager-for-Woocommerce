@@ -4,6 +4,7 @@ Plugin maison regroupant les règles et automatismes de gestion des **stocks ré
 
 - **Version** : 0.1.0
 - **Prérequis** : WordPress 6.8+, PHP 7.4+, WooCommerce 9.9+ (testé jusqu'à 11.0)
+- **Dépendance optionnelle** : pour valoriser le stock à son coût d'achat sur « Gestion du stock », le plugin lit le coût déclaré par « Cost of Goods Sold » (natif WooCommerce 10.3+, à activer dans Réglages → Avancé → Fonctionnalités) ou par le plugin gratuit « Cost of Goods for WooCommerce » (WPFactory). Sans l'un des deux, seule la valeur marchande est calculée.
 - **Préfixe** : `rsmw_` (options, hooks) / `RSMW\` (namespace PHP)
 - **Text domain** : `real-stock-manager-for-woocommerce` (doit rester identique au slug du dossier)
 
@@ -96,6 +97,7 @@ Une case à cocher `rsmw_module_mon_module_enabled` apparaît automatiquement da
 | `rsmw_setting` | filtre | Filtrer la valeur d'un réglage. |
 | `rsmw_upgrade` | action | Migrations de données à l'activation après changement de version. |
 | `rsmw_activated` / `rsmw_deactivated` | actions | Activation / désactivation. |
+| `rsmw_product_cost` | filtre | Ajuster le coût d'achat unitaire résolu pour un produit (`RSMW\Preparation\Cost::for_product()`). |
 
 ## Développement
 

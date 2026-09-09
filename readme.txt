@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,10 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 1.3.0 =
+* La page « Gestion du stock » affiche deux nouvelles cellules : la valeur d'achat et la valeur marchande du stock réel, chacune avec un second chiffre incluant le réassort déjà commandé au fournisseur mais pas encore reçu.
+* La valeur d'achat s'appuie sur « Cost of Goods Sold » (natif WooCommerce 10.3+) ou, à défaut, sur le plugin « Cost of Goods for WooCommerce » (WPFactory). Sans l'un des deux, la cellule l'indique plutôt que d'afficher un montant à zéro trompeur ; le panneau de diagnostic précise la source détectée.
 
 = 1.2.0 =
 * La page « Besoins & stock » est renommée « Besoins pour commande », pour mieux refléter son usage : préparer une commande fournisseur plutôt que suivre le stock.
