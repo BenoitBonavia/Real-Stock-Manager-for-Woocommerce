@@ -38,7 +38,7 @@ final class Taxonomy {
 	/**
 	 * Slugs que le plugin s'est réservés pour ses propres filtres.
 	 *
-	 * Les onglets de « Besoins & stock » et le filtre de réception désignent le
+	 * Les onglets de « Besoins pour commande » et le filtre de réception désignent le
 	 * fournisseur par son slug dans l'URL, et emploient ces deux valeurs pour
 	 * « tout » et « sans fournisseur ». Un fournisseur nommé « Général » ou
 	 * « Sans fournisseur » produirait exactement le même slug, et le filtre

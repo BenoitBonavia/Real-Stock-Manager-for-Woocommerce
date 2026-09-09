@@ -1,6 +1,6 @@
 <?php
 /**
- * Page « Besoins & stock ».
+ * Page « Besoins pour commande ».
  *
  * @package RealStockManager
  */

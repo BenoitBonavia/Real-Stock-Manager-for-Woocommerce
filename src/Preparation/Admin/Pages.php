@@ -63,8 +63,8 @@ final class Pages {
 	public static function add_menu(): void {
 		add_submenu_page(
 			'woocommerce',
-			__( 'Besoins & stock', 'real-stock-manager-for-woocommerce' ),
-			__( 'Besoins & stock', 'real-stock-manager-for-woocommerce' ),
+			__( 'Besoins pour commande', 'real-stock-manager-for-woocommerce' ),
+			__( 'Besoins pour commande', 'real-stock-manager-for-woocommerce' ),
 			'manage_woocommerce',
 			Legacy::PAGE_NEEDS,
 			array( NeedsPage::class, 'render' )

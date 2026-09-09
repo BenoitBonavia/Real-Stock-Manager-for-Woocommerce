@@ -1,5 +1,5 @@
 /**
- * Pages « Besoins & stock » et « Gestion stock ».
+ * Pages « Besoins pour commande » et « Gestion stock ».
  *
  * Le socle reprend les valeurs de la carte Gutenberg (fond blanc, bordure rendue
  * en box-shadow, rayon 8px, rembourrage 16/24) et s'appuie sur les jetons du
@@ -356,7 +356,7 @@
 /*
  * Gouttières de 10px, et non 24px.
  *
- * La page « Besoins & stock » compte jusqu'à dix colonnes depuis l'arrivée du
+ * La page « Besoins pour commande » compte jusqu'à dix colonnes depuis l'arrivée du
  * fournisseur et du champ de commande. À 24px de chaque côté, les seules marges
  * consommaient près de 500px — le tableau débordait de l'écran avant d'avoir
  * affiché un chiffre. Les 24px sont conservés aux deux extrémités, pour que le
@@ -629,7 +629,7 @@
 }
 
 /*
- * Compteur des onglets de la page « Besoins & stock ».
+ * Compteur des onglets de la page « Besoins pour commande ».
  *
  * WordPress ne style `.count` que dans `.subsubsub`, et WooCommerce ne style la
  * bulle `.update-plugins` que sur ses propres écrans de réglages : aucune des

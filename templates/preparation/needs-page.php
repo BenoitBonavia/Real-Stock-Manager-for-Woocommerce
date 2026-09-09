@@ -1,6 +1,6 @@
 <?php
 /**
- * Gabarit de la page « Besoins & stock ».
+ * Gabarit de la page « Besoins pour commande ».
  *
  * @var array $data Données fournies par RSMW\Preparation\Admin\NeedsPage.
  *
@@ -36,7 +36,7 @@ $rsmw_orphan = \RSMW\Preparation\Admin\NeedsPage::TAB_NONE === $rsmw_tab;
 ?>
 <div class="wrap woocommerce rsmw-wrap">
 
-	<h1 class="wp-heading-inline"><?php esc_html_e( 'Besoins & stock', 'real-stock-manager-for-woocommerce' ); ?></h1>
+	<h1 class="wp-heading-inline"><?php esc_html_e( 'Besoins pour commande', 'real-stock-manager-for-woocommerce' ); ?></h1>
 	<a href="<?php echo esc_url( $data['stock_page_url'] ); ?>" class="page-title-action">
 		<?php esc_html_e( 'Gestion du stock', 'real-stock-manager-for-woocommerce' ); ?>
 	</a>

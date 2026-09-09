@@ -157,7 +157,7 @@ final class SettingsTab extends \WC_Settings_Page {
 				'desc'              => $this->override_note(
 					$overrides,
 					Config::KEY_CACHE_TTL,
-					__( 'En secondes. Ne concerne pas la page « Besoins & stock », qui recalcule à chaque affichage.', 'real-stock-manager-for-woocommerce' )
+					__( 'En secondes. Ne concerne pas la page « Besoins pour commande », qui recalcule à chaque affichage.', 'real-stock-manager-for-woocommerce' )
 				),
 				'id'                => Settings::PREFIX . Config::KEY_CACHE_TTL,
 				'type'              => 'number',
@@ -204,7 +204,7 @@ final class SettingsTab extends \WC_Settings_Page {
 		if ( ! $tracked ) {
 			$description .= '<br><strong style="color:#b32d2e">' . sprintf(
 				/* translators: %s: slug du statut de précommande. */
-				esc_html__( 'Sans effet pour l’instant : %s ne figure pas dans les « Statuts à préparer » de l’onglet Préparation. Tant que c’est le cas, la bascule reste suspendue — elle sortirait sinon chaque précommande du circuit : absente de « Besoins & stock », jamais servie par l’entrée de stock, et jamais ramenée en « À empaqueter ».', 'real-stock-manager-for-woocommerce' ),
+				esc_html__( 'Sans effet pour l’instant : %s ne figure pas dans les « Statuts à préparer » de l’onglet Préparation. Tant que c’est le cas, la bascule reste suspendue — elle sortirait sinon chaque précommande du circuit : absente de « Besoins pour commande », jamais servie par l’entrée de stock, et jamais ramenée en « À empaqueter ».', 'real-stock-manager-for-woocommerce' ),
 				'<code>' . esc_html( PreOrderLegacy::STATUS_SLUG ) . '</code>'
 			) . '</strong>';
 		}
@@ -331,7 +331,7 @@ final class SettingsTab extends \WC_Settings_Page {
 		/*
 		 * Piège silencieux : le statut « Précommande » n'est pas suivi par défaut.
 		 * Une commande qu'on y place sort alors du circuit de préparation — elle
-		 * disparaît de « Besoins & stock », l'entrée de stock ne lui attribue plus
+		 * disparaît de « Besoins pour commande », l'entrée de stock ne lui attribue plus
 		 * rien, et sa barre d'avancement se tait. Rien ne le signale à l'écran :
 		 * la commande a juste l'air d'aller bien. D'où cet avertissement, qui ne
 		 * se déclenche que si des commandes portent effectivement le statut.
@@ -339,7 +339,7 @@ final class SettingsTab extends \WC_Settings_Page {
 		if ( ! PreOrderConfig::status_is_tracked() && ( PreOrderStatus::order_count() > 0 || PreOrderConfig::auto_status() ) ) {
 			$lines[] = '<strong style="color:#b32d2e">' . sprintf(
 				/* translators: %s: slug du statut de précommande. */
-				esc_html__( 'Le statut « Précommande » ne figure pas dans les statuts suivis ci-dessous. Une commande qu’on y place sort du circuit de préparation : absente de « Besoins & stock », jamais servie par l’entrée de stock, et jamais ramenée en « À empaqueter ». Ajoutez %s aux statuts suivis, ou ne vous servez pas de ce statut — le marquage des précommandes n’en dépend pas.', 'real-stock-manager-for-woocommerce' ),
+				esc_html__( 'Le statut « Précommande » ne figure pas dans les statuts suivis ci-dessous. Une commande qu’on y place sort du circuit de préparation : absente de « Besoins pour commande », jamais servie par l’entrée de stock, et jamais ramenée en « À empaqueter ». Ajoutez %s aux statuts suivis, ou ne vous servez pas de ce statut — le marquage des précommandes n’en dépend pas.', 'real-stock-manager-for-woocommerce' ),
 				'<code>' . esc_html( PreOrderLegacy::STATUS_SLUG ) . '</code>'
 			) . '</strong>';
 		}

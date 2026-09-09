@@ -83,7 +83,7 @@ final class OrderPreparation extends AbstractModule {
 			 * Le champ « Fournisseur » est câblé ici, et non depuis un module à
 			 * lui : le fournisseur est une dimension de la préparation, pas un
 			 * comportement autonome. Pouvoir désactiver le champ pendant que les
-			 * onglets de la page « Besoins & stock » regroupent par fournisseur
+			 * onglets de la page « Besoins pour commande » regroupent par fournisseur
 			 * n'aurait aucun sens. La taxonomie, elle, vit hors module.
 			 */
 			SupplierProductField::register();
@@ -93,7 +93,7 @@ final class OrderPreparation extends AbstractModule {
 	/**
 	 * Invalide la table des besoins sur tout événement de commande.
 	 *
-	 * La page « Besoins & stock » recalcule de toute façon systématiquement : ces
+	 * La page « Besoins pour commande » recalcule de toute façon systématiquement : ces
 	 * hooks ne servent qu'aux lectures secondaires, comme l'indicateur des fiches
 	 * produit ou la notice de réaffectation.
 	 */

@@ -1,5 +1,5 @@
 /**
- * Page « Besoins & stock » — recherche, filtres, tri et export CSV.
+ * Page « Besoins pour commande » — recherche, filtres, tri et export CSV.
  *
  * Tout se joue côté client sur les lignes déjà rendues : le tableau est complet
  * dès le chargement, il n'y a pas de pagination à gérer.

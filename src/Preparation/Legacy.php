@@ -62,7 +62,7 @@ final class Legacy {
 	/** Transient portant l'horodatage et le périmètre du dernier calcul. */
 	public const CACHE_META_KEY = self::CACHE_KEY . '_meta';
 
-	/** Slug de la page « Besoins & stock » — conservé pour ne pas casser les signets. */
+	/** Slug de la page « Besoins pour commande » — conservé pour ne pas casser les signets. */
 	public const PAGE_NEEDS = 'mh-prep-stock';
 
 	/** Slug de la page « Gestion stock » — conservé pour ne pas casser les signets. */

@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * Le champ est posé sur le PRODUIT, jamais sur la variation : un fournisseur
  * fournit une référence achetée, pas une taille. Toutes les déclinaisons d'un
- * produit variable partagent donc son fournisseur, et la page « Besoins & stock »
+ * produit variable partagent donc son fournisseur, et la page « Besoins pour commande »
  * remonte au parent pour l'afficher.
  *
  * Volontairement hors des classes `show_if_simple` : le champ doit apparaître sur
@@ -97,7 +97,7 @@ final class ProductField {
 			);
 		}
 
-		return __( 'Regroupe la référence dans l’onglet de ce fournisseur sur la page « Besoins & stock ». Sur un produit à variations, s’applique à toutes les déclinaisons.', 'real-stock-manager-for-woocommerce' );
+		return __( 'Regroupe la référence dans l’onglet de ce fournisseur sur la page « Besoins pour commande ». Sur un produit à variations, s’applique à toutes les déclinaisons.', 'real-stock-manager-for-woocommerce' );
 	}
 
 	/**

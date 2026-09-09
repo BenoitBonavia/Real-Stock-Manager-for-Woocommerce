@@ -63,7 +63,7 @@ final class Labels {
 	/**
 	 * Charge en une fois les produits qui vont être libellés.
 	 *
-	 * Sans cela, la page « Besoins & stock » déclenche une requête par ligne :
+	 * Sans cela, la page « Besoins pour commande » déclenche une requête par ligne :
 	 * `wc_get_product()` sur une référence non mise en cache va chercher le post
 	 * puis ses métadonnées. Sur un catalogue de plusieurs centaines de variations,
 	 * cela représente l'essentiel du temps de rendu.

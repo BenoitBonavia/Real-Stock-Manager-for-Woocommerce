@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.2
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 1.2.0 =
+* La page « Besoins & stock » est renommée « Besoins pour commande », pour mieux refléter son usage : préparer une commande fournisseur plutôt que suivre le stock.
 
 = 1.1.2 =
 * Correctif : dans la vue « À traiter » de la liste des commandes, le nombre total d’éléments et le nombre de pages étaient ceux de TOUTES les commandes, pas celles de la vue. Le tableau affichait bien les bonnes commandes, mais la pagination annonçait des pages qui n’existaient pas.

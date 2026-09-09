@@ -119,7 +119,7 @@ Ces déclarations sont faites sur `before_woocommerce_init` dans le fichier prin
 
 Remplace le snippet WPCode « Maison Hespérides — Préparation ». Gère un stock physique réel,
 distinct du stock WooCommerce : statut de commande « À empaqueter », métabox de pointage,
-pages *Besoins & stock* et *Gestion stock*, attribution FIFO, champs de stock sur les produits.
+pages *Besoins pour commande* et *Gestion stock*, attribution FIFO, champs de stock sur les produits.
 
 ### Les trois états du stock
 
@@ -423,7 +423,7 @@ chargement suivant.
 ## Fournisseurs
 
 Le marchand travaille en flux tendu avec plusieurs fournisseurs, et son geste réel est fournisseur par
-fournisseur. La page « Besoins & stock » a donc un onglet « Général », un onglet par fournisseur, et un
+fournisseur. La page « Besoins pour commande » a donc un onglet « Général », un onglet par fournisseur, et un
 onglet « Sans fournisseur ».
 
 ### Une taxonomie, `rsmw_supplier`
