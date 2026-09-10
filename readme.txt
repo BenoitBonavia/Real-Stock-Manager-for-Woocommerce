@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 2.2.0 =
+* Correctif : sur « Besoins Back in Stock », le champ « À commander » partait à 0 plutôt que prérempli avec le manque. Recommander d’office tout ce qui manque suppose que chaque inscrit à la liste d’attente achète, ce qui n’est jamais vrai — la quantité à ajouter reste un choix délibéré, à ajuster selon le taux de conversion réellement constaté.
 
 = 2.1.0 =
 * « Besoins Back in Stock » simplifié : la colonne « Inscrits » disparaît, « Disponible » et « Satisfait » (redondants la plupart du temps) fusionnent en une seule colonne.

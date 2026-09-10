@@ -323,9 +323,17 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 								</td>
 								<td class="rsmw-num">
 									<?php if ( empty( $rsmw_bis_row['parent_level'] ) ) : ?>
+										<?php
+										/*
+										 * Valeur par défaut à 0, jamais le manque : tout n'est pas à
+										 * recommander d'office, le taux de conversion réel de la liste
+										 * d'attente reste inconnu tant qu'aucune commande n'est passée.
+										 * Le geste est délibéré, pas prérempli.
+										 */
+										?>
 										<input type="number" class="rsmw-field__input--qty"
 											name="rsmw_bis_order[<?php echo esc_attr( (string) $rsmw_bis_row['id'] ); ?>]"
-											value="<?php echo esc_attr( (string) $rsmw_bis_row['manque'] ); ?>"
+											value="0"
 											min="0" step="1" inputmode="numeric"
 											aria-label="<?php esc_attr_e( 'Quantité à ajouter au commandé fournisseur', 'real-stock-manager-for-woocommerce' ); ?>">
 									<?php else : ?>
