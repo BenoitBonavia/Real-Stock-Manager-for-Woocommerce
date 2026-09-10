@@ -559,7 +559,20 @@ séparément.
 Une inscription posée sur un produit variable pris dans son ensemble (réglage hôte
 `variable_any_variation_backinstock`) n'a pas de stock qui lui soit propre : elle apparaît sur une
 ligne « toutes déclinaisons », servie uniquement par ce que les variations laissent de côté après
-leurs propres demandes.
+leurs propres demandes. « Satisfait » (demande plafonnée au disponible) est la seule colonne de
+couverture affichée : elle coïncide avec le disponible brut dès que celui-ci ne dépasse pas la
+demande, le cas dominant sur cet écran.
+
+### Ajouter du stock commandé depuis l'écran
+
+Chaque ligne porte un champ de quantité, préchargé avec le manque, et un bouton « Valider la
+commande » en pied de tableau. La saisie est déléguée telle quelle à
+`RSMW\Preparation\Purchase::apply()` — la même classe que la commande fournisseur en lot de
+« Besoins pour commande » — pour que l'ajout suive exactement les mêmes règles : le compteur
+« commandé fournisseur » (`Supply`) monte, puis l'attribution FIFO sert d'abord les commandes
+clients les plus anciennes encore non couvertes. Une ligne « toutes déclinaisons » n'a pas de champ :
+commander au niveau du parent n'aurait pas de référence de stock à créditer, il faut viser la
+déclinaison précise.
 
 ### Réglages
 

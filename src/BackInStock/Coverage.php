@@ -51,11 +51,11 @@ final class Coverage {
 		$direct       = array();
 		$parent_level = array();
 
-		foreach ( $demand as $pid => $entry ) {
+		foreach ( $demand as $pid => $units ) {
 			if ( self::is_variable_parent( $pid, $posts ) ) {
-				$parent_level[ $pid ] = $entry;
+				$parent_level[ $pid ] = $units;
 			} else {
-				$direct[ $pid ] = $entry;
+				$direct[ $pid ] = $units;
 			}
 		}
 
@@ -63,12 +63,12 @@ final class Coverage {
 		$parents  = array();
 		$rows     = array();
 
-		foreach ( $direct as $pid => $entry ) {
+		foreach ( $direct as $pid => $units ) {
 			$available       = self::available_breakdown( $pid, $prep_map );
 			$parent_id       = self::parent_for( $pid, $posts );
 			$parents[ $pid ] = $parent_id;
 
-			$rows[ $pid ] = self::build_row( $pid, $entry, $available['libre'], $available['a_venir'], false );
+			$rows[ $pid ] = self::build_row( $pid, $units, $available['libre'], $available['a_venir'], false );
 
 			if ( $parent_id === $pid ) {
 				continue;
@@ -79,8 +79,8 @@ final class Coverage {
 			 * alimente le reliquat mutualisé du parent — physique et à venir
 			 * suivis séparément, le physique étant consommé en premier.
 			 */
-			$used_libre   = min( $entry['units'], $available['libre'] );
-			$used_a_venir = min( max( 0, $entry['units'] - $used_libre ), $available['a_venir'] );
+			$used_libre   = min( $units, $available['libre'] );
+			$used_a_venir = min( max( 0, $units - $used_libre ), $available['a_venir'] );
 
 			if ( ! isset( $leftover[ $parent_id ] ) ) {
 				$leftover[ $parent_id ] = array(
@@ -103,13 +103,13 @@ final class Coverage {
 		 */
 		$variable_ok = Host::variable_any_variation_enabled();
 
-		foreach ( $parent_level as $pid => $entry ) {
+		foreach ( $parent_level as $pid => $units ) {
 			$parents[ $pid ] = $pid;
 
 			$libre   = $variable_ok ? (int) ( $leftover[ $pid ]['libre'] ?? 0 ) : 0;
 			$a_venir = $variable_ok ? (int) ( $leftover[ $pid ]['a_venir'] ?? 0 ) : 0;
 
-			$rows[ $pid ] = self::build_row( $pid, $entry, $libre, $a_venir, true );
+			$rows[ $pid ] = self::build_row( $pid, $units, $libre, $a_venir, true );
 		}
 
 		$suppliers = Resolver::map_for( array_keys( $rows ), $parents );
@@ -149,12 +149,11 @@ final class Coverage {
 	 *
 	 * @param array $rows Lignes.
 	 *
-	 * @return array{refs:int, inscrits:int, demande:int, satisfait:int, manque:int, refs_manque:int, taux:float}
+	 * @return array{refs:int, demande:int, satisfait:int, manque:int, refs_manque:int, taux:float}
 	 */
 	public static function totals( array $rows ): array {
 		$totals = array(
 			'refs'        => count( $rows ),
-			'inscrits'    => 0,
 			'demande'     => 0,
 			'satisfait'   => 0,
 			'manque'      => 0,
@@ -163,7 +162,6 @@ final class Coverage {
 		);
 
 		foreach ( $rows as $row ) {
-			$totals['inscrits']  += $row['inscrits'];
 			$totals['demande']   += $row['demande'];
 			$totals['satisfait'] += $row['satisfait'];
 			$totals['manque']    += $row['manque'];
@@ -214,17 +212,21 @@ final class Coverage {
 	/**
 	 * Construit une ligne à partir de la demande et du stock disponible.
 	 *
-	 * @param int   $pid          Référence.
-	 * @param array $entry        Demande agrégée (`subs`, `units`).
-	 * @param int   $libre        Stock physique libre disponible.
-	 * @param int   $a_venir      Réassort commandé disponible.
-	 * @param bool  $parent_level Inscription au niveau du produit parent variable.
+	 * « Satisfait » porte à lui seul l'information de « Disponible » plafonnée
+	 * à la demande : les deux coïncident dès que le stock ne dépasse pas ce
+	 * qui est demandé, le cas dominant sur cet écran. Inutile de les afficher
+	 * tous les deux.
+	 *
+	 * @param int  $pid          Référence.
+	 * @param int  $demande      Unités demandées.
+	 * @param int  $libre        Stock physique libre disponible.
+	 * @param int  $a_venir      Réassort commandé disponible.
+	 * @param bool $parent_level Inscription au niveau du produit parent variable.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private static function build_row( int $pid, array $entry, int $libre, int $a_venir, bool $parent_level ): array {
+	private static function build_row( int $pid, int $demande, int $libre, int $a_venir, bool $parent_level ): array {
 		$disponible = $libre + $a_venir;
-		$demande    = (int) $entry['units'];
 		$satisfait  = min( $demande, $disponible );
 		$manque     = max( 0, $demande - $disponible );
 		$taux       = $demande > 0 ? min( 100.0, ( $satisfait / $demande ) * 100 ) : 100.0;
@@ -232,11 +234,9 @@ final class Coverage {
 		return array(
 			'id'           => $pid,
 			'parent_level' => $parent_level,
-			'inscrits'     => (int) $entry['subs'],
 			'demande'      => $demande,
 			'libre'        => $libre,
 			'a_venir'      => $a_venir,
-			'disponible'   => $disponible,
 			'satisfait'    => $satisfait,
 			'manque'       => $manque,
 			'taux'         => $taux,

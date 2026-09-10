@@ -59,6 +59,7 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 		$rsmw_bis_rows        = (array) $data['rows'];
 		$rsmw_bis_totals      = (array) $data['totals'];
 		$rsmw_bis_statuses    = (array) $data['statuses'];
+		$rsmw_bis_purchase    = $data['purchase'];
 		$rsmw_bis_status_list = implode(
 			', ',
 			array_map( array( '\RSMW\BackInStock\Host', 'status_label' ), $rsmw_bis_statuses )
@@ -88,14 +89,40 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 			</div>
 		<?php endif; ?>
 
+		<?php if ( is_array( $rsmw_bis_purchase ) && ! empty( $rsmw_bis_purchase['lines'] ) ) : ?>
+			<div class="rsmw-card rsmw-card--report rsmw-card--report-ordered">
+				<div class="rsmw-card__header">
+					<h2 class="rsmw-card__title"><?php esc_html_e( 'Ajout au commandé fournisseur enregistré', 'real-stock-manager-for-woocommerce' ); ?></h2>
+				</div>
+				<div class="rsmw-card__body">
+					<p class="rsmw-report__figure">
+						<?php
+						printf(
+							/* translators: 1: nombre d'articles, 2: nombre de références, 3: quantité réservée. */
+							esc_html__( '%1$s article(s) ajoutés sur %2$s référence(s). %3$s ont été réservés sur des commandes clients en attente.', 'real-stock-manager-for-woocommerce' ),
+							'<strong>' . esc_html( number_format_i18n( (int) $rsmw_bis_purchase['qty_total'] ) ) . '</strong>',
+							'<strong>' . esc_html( number_format_i18n( (int) $rsmw_bis_purchase['references'] ) ) . '</strong>',
+							'<strong>' . esc_html( number_format_i18n( (int) $rsmw_bis_purchase['covers_total'] ) ) . '</strong>'
+						);
+						?>
+					</p>
+					<?php if ( ! empty( $rsmw_bis_purchase['orders'] ) ) : ?>
+						<p>
+							<?php esc_html_e( 'Commandes clients concernées :', 'real-stock-manager-for-woocommerce' ); ?>
+							<?php foreach ( $rsmw_bis_purchase['orders'] as $rsmw_bis_index => $rsmw_bis_order ) : ?>
+								<?php echo $rsmw_bis_index > 0 ? ' &middot; ' : ''; ?>
+								<a href="<?php echo esc_url( $rsmw_bis_order['url'] ); ?>">#<?php echo esc_html( $rsmw_bis_order['num'] ); ?></a>
+							<?php endforeach; ?>
+						</p>
+					<?php endif; ?>
+				</div>
+			</div>
+		<?php endif; ?>
+
 		<div class="rsmw-kpis">
 			<div class="rsmw-kpi">
 				<div class="rsmw-kpi__label"><?php esc_html_e( 'Références demandées', 'real-stock-manager-for-woocommerce' ); ?></div>
 				<div class="rsmw-kpi__value" id="k-bis-refs"><?php echo esc_html( (string) count( $rsmw_bis_rows ) ); ?></div>
-			</div>
-			<div class="rsmw-kpi">
-				<div class="rsmw-kpi__label"><?php esc_html_e( 'Inscrits', 'real-stock-manager-for-woocommerce' ); ?></div>
-				<div class="rsmw-kpi__value" id="k-bis-inscrits"><?php echo esc_html( (string) (int) $rsmw_bis_totals['inscrits'] ); ?></div>
 			</div>
 			<div class="rsmw-kpi">
 				<div class="rsmw-kpi__label"><?php esc_html_e( 'Demandé (unités)', 'real-stock-manager-for-woocommerce' ); ?></div>
@@ -108,7 +135,7 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 			<div class="rsmw-kpi rsmw-kpi--alert">
 				<div class="rsmw-kpi__label"><?php esc_html_e( 'Manquantes', 'real-stock-manager-for-woocommerce' ); ?></div>
 				<div class="rsmw-kpi__value" id="k-bis-manque"><?php echo esc_html( (string) (int) $rsmw_bis_totals['manque'] ); ?></div>
-				<div class="rsmw-kpi__sub" id="k-bis-refsmanque-wrap">
+				<div class="rsmw-kpi__sub">
 					<span id="k-bis-refsmanque"><?php echo esc_html( (string) (int) $rsmw_bis_totals['refs_manque'] ); ?></span>
 					<?php esc_html_e( 'référence(s) concernée(s)', 'real-stock-manager-for-woocommerce' ); ?>
 				</div>
@@ -188,16 +215,14 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 					</div>
 				</div>
 			<?php else : ?>
+				<form method="post">
+				<?php wp_nonce_field( $data['order_nonce'] ); ?>
 				<div class="rsmw-card__body rsmw-card__body--flush">
 					<table class="rsmw-table" id="rsmw-bis-table">
 						<thead>
 							<tr>
 								<th data-key="name"><?php esc_html_e( 'Référence', 'real-stock-manager-for-woocommerce' ); ?></th>
 								<th data-key="fournisseur"><?php esc_html_e( 'Fournisseur', 'real-stock-manager-for-woocommerce' ); ?></th>
-								<th class="rsmw-num" data-key="inscrits"
-									title="<?php esc_attr_e( 'Nombre d’inscriptions actives', 'real-stock-manager-for-woocommerce' ); ?>">
-									<?php esc_html_e( 'Inscrits', 'real-stock-manager-for-woocommerce' ); ?>
-								</th>
 								<th class="rsmw-num" data-key="demande"
 									title="<?php esc_attr_e( 'Unités demandées (quantité déclarée, 1 par défaut)', 'real-stock-manager-for-woocommerce' ); ?>">
 									<?php esc_html_e( 'Demandé', 'real-stock-manager-for-woocommerce' ); ?>
@@ -210,12 +235,8 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 									title="<?php esc_attr_e( 'Commandé au fournisseur, non attribué à une commande client', 'real-stock-manager-for-woocommerce' ); ?>">
 									<?php esc_html_e( 'À venir', 'real-stock-manager-for-woocommerce' ); ?>
 								</th>
-								<th class="rsmw-num" data-key="disponible"
-									title="<?php esc_attr_e( 'Stock libre déjà là et à venir, au total', 'real-stock-manager-for-woocommerce' ); ?>">
-									<?php esc_html_e( 'Disponible', 'real-stock-manager-for-woocommerce' ); ?>
-								</th>
 								<th class="rsmw-num" data-key="satisfait"
-									title="<?php esc_attr_e( 'Unités qui pourront être satisfaites', 'real-stock-manager-for-woocommerce' ); ?>">
+									title="<?php esc_attr_e( 'Unités qui pourront être satisfaites par le stock libre, déjà là ou à venir', 'real-stock-manager-for-woocommerce' ); ?>">
 									<?php esc_html_e( 'Satisfait', 'real-stock-manager-for-woocommerce' ); ?>
 								</th>
 								<th class="rsmw-num" data-key="manque"
@@ -225,6 +246,10 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 								<th class="rsmw-num" data-key="taux"
 									title="<?php esc_attr_e( 'Part de la demande satisfaite', 'real-stock-manager-for-woocommerce' ); ?>">
 									<?php esc_html_e( 'Taux', 'real-stock-manager-for-woocommerce' ); ?>
+								</th>
+								<th class="rsmw-num"
+									title="<?php esc_attr_e( 'Quantité à ajouter au commandé fournisseur pour cette référence', 'real-stock-manager-for-woocommerce' ); ?>">
+									<?php esc_html_e( 'À commander', 'real-stock-manager-for-woocommerce' ); ?>
 								</th>
 							</tr>
 						</thead>
@@ -249,11 +274,9 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 								data-sku="<?php echo esc_attr( $rsmw_bis_row['sku'] ); ?>"
 								data-search="<?php echo esc_attr( $rsmw_bis_search ); ?>"
 								data-name="<?php echo esc_attr( trim( $rsmw_bis_row['name'] . ' ' . $rsmw_bis_row['variant'] ) ); ?>"
-								data-inscrits="<?php echo esc_attr( (string) $rsmw_bis_row['inscrits'] ); ?>"
 								data-demande="<?php echo esc_attr( (string) $rsmw_bis_row['demande'] ); ?>"
 								data-libre="<?php echo esc_attr( (string) $rsmw_bis_row['libre'] ); ?>"
 								data-avenir="<?php echo esc_attr( (string) $rsmw_bis_row['a_venir'] ); ?>"
-								data-disponible="<?php echo esc_attr( (string) $rsmw_bis_row['disponible'] ); ?>"
 								data-satisfait="<?php echo esc_attr( (string) $rsmw_bis_row['satisfait'] ); ?>"
 								data-manque="<?php echo esc_attr( (string) $rsmw_bis_row['manque'] ); ?>"
 								data-taux="<?php echo esc_attr( number_format( (float) $rsmw_bis_row['taux'], 1, '.', '' ) ); ?>">
@@ -279,16 +302,12 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 										<span class="rsmw-lack">—</span>
 									<?php endif; ?>
 								</td>
-								<td class="rsmw-num"><?php echo esc_html( (string) $rsmw_bis_row['inscrits'] ); ?></td>
 								<td class="rsmw-num"><?php echo esc_html( (string) $rsmw_bis_row['demande'] ); ?></td>
 								<td class="rsmw-num rsmw-col-secondary">
 									<?php echo $rsmw_bis_row['libre'] ? esc_html( (string) $rsmw_bis_row['libre'] ) : '<span class="rsmw-zero">·</span>'; ?>
 								</td>
 								<td class="rsmw-num rsmw-col-secondary <?php echo $rsmw_bis_row['a_venir'] > 0 ? 'rsmw-ordered' : ''; ?>">
 									<?php echo $rsmw_bis_row['a_venir'] ? esc_html( (string) $rsmw_bis_row['a_venir'] ) : '<span class="rsmw-zero">·</span>'; ?>
-								</td>
-								<td class="rsmw-num">
-									<?php echo $rsmw_bis_row['disponible'] ? esc_html( (string) $rsmw_bis_row['disponible'] ) : '<span class="rsmw-zero">·</span>'; ?>
 								</td>
 								<td class="rsmw-num">
 									<?php echo $rsmw_bis_row['satisfait'] ? esc_html( (string) $rsmw_bis_row['satisfait'] ) : '<span class="rsmw-zero">·</span>'; ?>
@@ -302,6 +321,17 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 										<span class="rsmw-gauge__label"><?php echo esc_html( number_format_i18n( (float) $rsmw_bis_row['taux'], 0 ) ); ?> %</span>
 									</div>
 								</td>
+								<td class="rsmw-num">
+									<?php if ( empty( $rsmw_bis_row['parent_level'] ) ) : ?>
+										<input type="number" class="rsmw-field__input--qty"
+											name="rsmw_bis_order[<?php echo esc_attr( (string) $rsmw_bis_row['id'] ); ?>]"
+											value="<?php echo esc_attr( (string) $rsmw_bis_row['manque'] ); ?>"
+											min="0" step="1" inputmode="numeric"
+											aria-label="<?php esc_attr_e( 'Quantité à ajouter au commandé fournisseur', 'real-stock-manager-for-woocommerce' ); ?>">
+									<?php else : ?>
+										<span class="rsmw-zero" title="<?php esc_attr_e( 'Une ligne « toutes déclinaisons » ne se commande pas directement : commandez la déclinaison précise.', 'real-stock-manager-for-woocommerce' ); ?>">·</span>
+									<?php endif; ?>
+								</td>
 							</tr>
 						<?php endforeach; ?>
 						</tbody>
@@ -310,6 +340,15 @@ $rsmw_bis_host_active = ! empty( $data['host_active'] );
 						<?php esc_html_e( 'Aucune référence ne correspond à ce filtre.', 'real-stock-manager-for-woocommerce' ); ?>
 					</div>
 				</div>
+				<div class="rsmw-card__footer">
+					<button type="submit" name="rsmw_bis_order_submit" value="1" class="button button-primary">
+						<?php esc_html_e( 'Valider la commande', 'real-stock-manager-for-woocommerce' ); ?>
+					</button>
+					<span class="rsmw-field__hint">
+						<?php esc_html_e( 'Ajoute les quantités saisies au commandé fournisseur. Une ligne à zéro n’est pas commandée.', 'real-stock-manager-for-woocommerce' ); ?>
+					</span>
+				</div>
+				</form>
 			<?php endif; ?>
 		</div>
 

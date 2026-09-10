@@ -32,10 +32,9 @@ final class Demand {
 	 * Les deux jointures passent par une sous-requête `GROUP BY post_id` —
 	 * jamais un LEFT/INNER JOIN direct sur `wp_postmeta` — pour qu'une
 	 * inscription reste sur UNE SEULE ligne du résultat même si une clé de
-	 * métadonnée est dupliquée en base, ce que rien n'empêche côté hôte. Un
-	 * simple `COUNT( DISTINCT p.ID )` aurait protégé `subs`, mais pas
-	 * `SUM( units )` : la somme aurait compté deux fois la quantité d'une
-	 * inscription apparue sur deux lignes de jointure.
+	 * métadonnée est dupliquée en base, ce que rien n'empêche côté hôte. Sans
+	 * cela, `SUM( units )` compterait deux fois la quantité d'une inscription
+	 * apparue sur deux lignes de jointure.
 	 *
 	 * La quantité est castée en `SIGNED`, jamais `UNSIGNED` : MySQL
 	 * transforme un entier négatif casté en `UNSIGNED` en son complément
@@ -43,7 +42,7 @@ final class Demand {
 	 * ce que `GREATEST( ..., 1 )` ne peut plus corriger une fois la valeur
 	 * déjà démesurée.
 	 *
-	 * @return array<int, array{subs:int, units:int}> Référence => inscrits, unités.
+	 * @return array<int, int> Référence => unités demandées.
 	 */
 	public static function fetch(): array {
 		global $wpdb;
@@ -59,7 +58,6 @@ final class Demand {
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared -- requête assemblée avec des marqueurs, puis passée à prepare() ; l'écran appelant recalcule à chaque affichage, comme la table des besoins.
 		$sql = $wpdb->prepare(
 			"SELECT ref.pid AS pid,
-			        COUNT( DISTINCT p.ID ) AS subs,
 			        SUM( GREATEST( CAST( COALESCE( NULLIF( qty.qty, '' ), '1' ) AS SIGNED ), 1 ) ) AS units
 			   FROM {$wpdb->posts} p
 			  INNER JOIN (
@@ -95,10 +93,7 @@ final class Demand {
 				continue;
 			}
 
-			$demand[ $pid ] = array(
-				'subs'  => (int) $row->subs,
-				'units' => (int) $row->units,
-			);
+			$demand[ $pid ] = (int) $row->units;
 		}
 
 		return $demand;

@@ -30,7 +30,6 @@
 		var missingOnly = onlyMissing.checked;
 		var partialOnly = onlyPartial.checked;
 		var visible = 0;
-		var inscrits = 0;
 		var demande = 0;
 		var satisfait = 0;
 		var manque = 0;
@@ -53,7 +52,6 @@
 			}
 
 			visible++;
-			inscrits += parseInt( d.inscrits, 10 ) || 0;
 			demande += parseInt( d.demande, 10 ) || 0;
 			satisfait += rowSatisfait;
 			manque += rowManque;
@@ -64,7 +62,6 @@
 		} );
 
 		document.getElementById( 'k-bis-refs' ).textContent = visible;
-		document.getElementById( 'k-bis-inscrits' ).textContent = inscrits;
 		document.getElementById( 'k-bis-demande' ).textContent = demande;
 		document.getElementById( 'k-bis-satisfait' ).textContent = satisfait;
 		document.getElementById( 'k-bis-manque' ).textContent = manque;
@@ -157,7 +154,7 @@
 			event.preventDefault();
 
 			var lines = [
-				[ 'Reference', 'SKU', 'Fournisseur', 'Inscrits', 'Demande', 'Stock libre', 'A venir', 'Disponible', 'Satisfait', 'Manque', 'Taux (%)' ]
+				[ 'Reference', 'SKU', 'Fournisseur', 'Demande', 'Stock libre', 'A venir', 'Satisfait', 'Manque', 'Taux (%)' ]
 			];
 
 			rows.forEach( function ( row ) {
@@ -166,7 +163,7 @@
 				}
 
 				var d = row.dataset;
-				lines.push( [ d.name, d.sku || '', d.fournisseur || '', d.inscrits, d.demande, d.libre, d.avenir, d.disponible, d.satisfait, d.manque, d.taux ] );
+				lines.push( [ d.name, d.sku || '', d.fournisseur || '', d.demande, d.libre, d.avenir, d.satisfait, d.manque, d.taux ] );
 			} );
 
 			var csv = lines.map( function ( line ) {
