@@ -20,9 +20,14 @@ final class View {
 	 *
 	 * @param string $template Nom du gabarit, sans extension.
 	 * @param array  $data     Données mises à disposition du gabarit sous `$data`.
+	 * @param string $dir      Sous-dossier de `templates/`. Les autres modules
+	 *                         qui partagent le rendu et les styles du module
+	 *                         Préparation — comme « Besoins Back in Stock » —
+	 *                         y passent le leur plutôt que de dupliquer ce
+	 *                         chargeur.
 	 */
-	public static function render( string $template, array $data = array() ): void {
-		$file = RSMW_PATH . 'templates/preparation/' . $template . '.php';
+	public static function render( string $template, array $data = array(), string $dir = 'preparation' ): void {
+		$file = RSMW_PATH . 'templates/' . $dir . '/' . $template . '.php';
 
 		if ( ! is_readable( $file ) ) {
 			return;

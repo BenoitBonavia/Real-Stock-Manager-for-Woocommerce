@@ -169,6 +169,7 @@ final class Plugin {
 			array(
 				\RSMW\Modules\OrderPreparation::class,
 				\RSMW\Modules\PreOrders::class,
+				\RSMW\Modules\BackInStockNeeds::class,
 			)
 		);
 	}

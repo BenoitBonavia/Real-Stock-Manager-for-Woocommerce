@@ -1,5 +1,5 @@
 /**
- * Pages « Besoins pour commande » et « Gestion stock ».
+ * Pages « Besoins pour commande », « Gestion stock » et « Besoins Back in Stock ».
  *
  * Le socle reprend les valeurs de la carte Gutenberg (fond blanc, bordure rendue
  * en box-shadow, rayon 8px, rembourrage 16/24) et s'appuie sur les jetons du
@@ -504,6 +504,52 @@
 .rsmw-ordered {
 	color: var(--rsmw-ordered);
 	font-weight: 600;
+}
+
+/* Jauge de taux — « Besoins Back in Stock ». Décorative (aria-hidden) : le
+   pourcentage lisible qui l'accompagne porte toujours la même information en
+   texte, jamais la jauge seule. */
+.rsmw-gauge {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.rsmw-gauge__track {
+	width: 60px;
+	height: 6px;
+	border-radius: 99px;
+	background: #e6e6ec;
+	overflow: hidden;
+	display: inline-flex;
+	flex: none;
+}
+
+.rsmw-gauge__fill {
+	display: block;
+	height: 100%;
+	/* Un taux très faible doit rester visible plutôt que de disparaître. */
+	min-width: 2px;
+	background: var(--rsmw-positive);
+}
+
+.rsmw-gauge__fill--mid {
+	background: var(--rsmw-ordered);
+}
+
+.rsmw-gauge__fill--low {
+	background: var(--rsmw-negative);
+}
+
+.rsmw-gauge__label {
+	font-variant-numeric: tabular-nums;
+	color: var(--rsmw-text-muted);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.rsmw-gauge--kpi .rsmw-gauge__track {
+	width: 100%;
 }
 
 /* Saisie de réception : plus déclaré qu'attendu. Signalé dès la frappe plutôt

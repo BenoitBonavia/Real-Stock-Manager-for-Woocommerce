@@ -7,6 +7,8 @@
 
 namespace RSMW\Admin;
 
+use RSMW\BackInStock\Config as BackInStockConfig;
+use RSMW\BackInStock\Host as BackInStockHost;
 use RSMW\Modules\ModuleInterface;
 use RSMW\Plugin;
 use RSMW\PreOrder\Config as PreOrderConfig;
@@ -54,10 +56,11 @@ final class SettingsTab extends \WC_Settings_Page {
 	 */
 	protected function get_own_sections(): array {
 		return array(
-			''            => __( 'Général', 'real-stock-manager-for-woocommerce' ),
-			'preparation' => __( 'Préparation', 'real-stock-manager-for-woocommerce' ),
-			'preorders'   => __( 'Précommandes', 'real-stock-manager-for-woocommerce' ),
-			'modules'     => __( 'Modules', 'real-stock-manager-for-woocommerce' ),
+			''              => __( 'Général', 'real-stock-manager-for-woocommerce' ),
+			'preparation'   => __( 'Préparation', 'real-stock-manager-for-woocommerce' ),
+			'preorders'     => __( 'Précommandes', 'real-stock-manager-for-woocommerce' ),
+			'back_in_stock' => __( 'Besoins Back in Stock', 'real-stock-manager-for-woocommerce' ),
+			'modules'       => __( 'Modules', 'real-stock-manager-for-woocommerce' ),
 		);
 	}
 
@@ -230,6 +233,115 @@ final class SettingsTab extends \WC_Settings_Page {
 				'id'   => Settings::PREFIX . 'preorder_options',
 			),
 		);
+	}
+
+	/**
+	 * Champs de la section « Besoins Back in Stock ».
+	 *
+	 * @return array
+	 */
+	protected function get_settings_for_back_in_stock_section(): array {
+		$status_options = array();
+
+		foreach ( BackInStockHost::statuses() as $status ) {
+			$status_options[ $status ] = BackInStockHost::status_label( $status ) . ' (' . $status . ')';
+		}
+
+		return array(
+			array(
+				'title' => __( 'Besoins Back in Stock', 'real-stock-manager-for-woocommerce' ),
+				'type'  => 'title',
+				'desc'  => __( 'Confronte les inscriptions à une alerte de retour en stock — posées par « Back In Stock Notifier for WooCommerce » — au stock libre du module Préparation.', 'real-stock-manager-for-woocommerce' ),
+				'id'    => Settings::PREFIX . 'back_in_stock_options',
+			),
+			array(
+				'title'    => __( 'Statuts comptés', 'real-stock-manager-for-woocommerce' ),
+				'desc'     => __( 'Inscriptions considérées comme une demande active, confrontées au stock libre.', 'real-stock-manager-for-woocommerce' ),
+				'id'       => Settings::PREFIX . BackInStockConfig::KEY_STATUSES,
+				'type'     => 'multiselect',
+				'class'    => 'wc-enhanced-select',
+				'css'      => 'min-width: 350px;',
+				'options'  => $status_options,
+				'default'  => BackInStockConfig::DEFAULT_STATUSES,
+				'desc_tip' => false,
+			),
+			array(
+				'type' => 'sectionend',
+				'id'   => Settings::PREFIX . 'back_in_stock_options',
+			),
+			array(
+				'title' => __( 'Diagnostic', 'real-stock-manager-for-woocommerce' ),
+				'type'  => 'title',
+				'desc'  => $this->back_in_stock_diagnostics_html(),
+				'id'    => Settings::PREFIX . 'back_in_stock_diagnostics',
+			),
+			array(
+				'type' => 'sectionend',
+				'id'   => Settings::PREFIX . 'back_in_stock_diagnostics',
+			),
+		);
+	}
+
+	/**
+	 * Tableau de diagnostic du module « Besoins Back in Stock ».
+	 *
+	 * @return string
+	 */
+	private function back_in_stock_diagnostics_html(): string {
+		if ( ! BackInStockHost::is_active() ) {
+			$action = BackInStockHost::is_installed()
+				? sprintf(
+					/* translators: %s: lien vers la liste des extensions. */
+					esc_html__( 'installée mais inactive — %s', 'real-stock-manager-for-woocommerce' ),
+					'<a href="' . esc_url( BackInStockHost::plugins_url() ) . '">' . esc_html__( 'l’activer', 'real-stock-manager-for-woocommerce' ) . '</a>'
+				)
+				: sprintf(
+					/* translators: %s: lien d'installation. */
+					esc_html__( 'absente — %s', 'real-stock-manager-for-woocommerce' ),
+					'<a href="' . esc_url( BackInStockHost::install_url() ) . '">' . esc_html__( 'l’installer', 'real-stock-manager-for-woocommerce' ) . '</a>'
+				);
+
+			return '<strong style="color:#b32d2e">'
+				. sprintf(
+					/* translators: 1: nom de l'extension hôte, 2: action proposée. */
+					esc_html__( '%1$s %2$s. Sans elle, cet écran reste vide.', 'real-stock-manager-for-woocommerce' ),
+					esc_html( BackInStockHost::name() ),
+					$action // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- lien déjà échappé ci-dessus.
+				)
+				. '</strong>';
+		}
+
+		$lines   = array();
+		$lines[] = '<span style="color:#00a32a">'
+			. sprintf(
+				/* translators: %s: nom de l'extension hôte. */
+				esc_html__( '%s détectée et active.', 'real-stock-manager-for-woocommerce' ),
+				esc_html( BackInStockHost::name() )
+			)
+			. '</span>';
+
+		$lines[] = sprintf(
+			/* translators: 1: oui/non, 2: oui/non. */
+			esc_html__( 'Champ « quantité » du formulaire d’inscription : %1$s · inscription au produit entier (toutes déclinaisons) : %2$s', 'real-stock-manager-for-woocommerce' ),
+			$this->yes_no( BackInStockHost::quantity_field_enabled() ),
+			$this->yes_no( BackInStockHost::variable_any_variation_enabled() )
+		);
+
+		if ( BackInStockHost::auto_delete_enabled() ) {
+			$lines[] = '<strong style="color:#b32d2e">' . sprintf(
+				/* translators: %d: nombre de jours. */
+				esc_html__( 'Suppression automatique des inscrits activée côté hôte, après %d jour(s) : les demandes « Alerte envoyée » anciennes disparaissent, ce qui fait fondre les compteurs ci-dessous.', 'real-stock-manager-for-woocommerce' ),
+				BackInStockHost::auto_delete_days()
+			) . '</strong>';
+		}
+
+		if ( null === Plugin::instance()->get_module( 'order_preparation' ) ) {
+			$lines[] = '<strong style="color:#b32d2e">'
+				. esc_html__( 'Le module « Préparation des commandes & stock physique » est inactif : le stock libre et le réassort commandé ne sont plus tenus à jour, les compteurs ci-dessous ne reflètent donc plus la réalité.', 'real-stock-manager-for-woocommerce' )
+				. '</strong>';
+		}
+
+		return implode( '<br>', $lines );
 	}
 
 	/**
@@ -474,7 +586,7 @@ final class SettingsTab extends \WC_Settings_Page {
 				'desc'    => __( 'Activer', 'real-stock-manager-for-woocommerce' ),
 				'id'      => Settings::PREFIX . 'module_' . $module->get_id() . '_enabled',
 				'type'    => 'checkbox',
-				'default' => 'yes',
+				'default' => $module->is_enabled_by_default() ? 'yes' : 'no',
 			);
 		}
 

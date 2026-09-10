@@ -525,6 +525,49 @@ sur les cellules. Deux règles à respecter en touchant au gabarit :
 - le script déréférence une douzaine d'identifiants **sans test de nullité**. Barre d'outils et
   `#mh-table` sont indissociables : quand il n'y a aucune ligne, le gabarit retire le bloc entier.
 
+## Module « Besoins Back in Stock »
+
+Confronte les inscriptions à une alerte de retour en stock — posées via l'extension tierce
+« Back In Stock Notifier for WooCommerce » (ProPluginsLab) — au stock libre du module Préparation.
+Page WooCommerce → Besoins Back in Stock : pour chaque référence demandée, combien d'unités le
+stock libre (physique déjà en boutique, ou commandé au fournisseur et non attribué à une commande
+client) permettrait d'honorer, combien il en manquerait, et le taux de couverture.
+
+**Désactivé par défaut**, contrairement aux autres modules : il ne sert à rien sur une boutique qui
+ne gère pas de liste d'attente de retour en stock.
+
+### Une dépendance souple, jamais déclarée en dur
+
+`src/BackInStock/Host.php` concentre tout ce que ce plugin sait de l'extension hôte — type de
+contenu, statuts d'inscription, métadonnées, réglages — sur le modèle de `RSMW\Preparation\Cost`
+avec « Cost of Goods for WooCommerce ». Aucune autre classe n'écrit `cwginstock`, `cwg_*` ou
+`CWGINSTOCK_*` en dur, et rien n'appelle les classes `CWG_*` de l'hôte : la lecture se fait
+exclusivement en base (`src/BackInStock/Demand.php`), ce qui permet à l'extension d'être absente,
+inactive ou remplacée sans casser l'amorçage. `Host::is_active()` gouverne l'affichage de la page :
+sans l'hôte, elle explique quoi installer plutôt que de rester vide sans explication.
+
+### Le calcul, miroir de « Besoins pour commande »
+
+`src/BackInStock/Coverage.php` calcule, référence par référence, le stock libre au-delà de ce que
+réclament déjà les commandes clients en attente — exactement le miroir de la colonne « Manque » de
+`NeedsPage::build_rows()` : là où elle retranche le stock du besoin client, ici on retranche le
+besoin client du stock, pour ne jamais promettre à la liste d'attente une unité que le module
+Préparation doit déjà à une commande. Le physique (`Stock`) est consommé avant le commandé
+fournisseur (`Supply`), pour que les colonnes « Stock libre » et « À venir » restent lisibles
+séparément.
+
+Une inscription posée sur un produit variable pris dans son ensemble (réglage hôte
+`variable_any_variation_backinstock`) n'a pas de stock qui lui soit propre : elle apparaît sur une
+ligne « toutes déclinaisons », servie uniquement par ce que les variations laissent de côté après
+leurs propres demandes.
+
+### Réglages
+
+WooCommerce → Réglages → Stocks réels → Besoins Back in Stock : statuts d'inscription comptés comme
+demande active (« En attente » et « Alerte envoyée » par défaut), et un panneau de diagnostic
+(extension hôte détectée, champ quantité, suppression automatique des inscrits côté hôte, module
+Préparation actif).
+
 ## Mises à jour depuis GitHub
 
 Le plugin embarque [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) 5.7

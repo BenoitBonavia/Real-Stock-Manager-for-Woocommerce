@@ -37,6 +37,16 @@ interface ModuleInterface {
 	public function is_enabled(): bool;
 
 	/**
+	 * Le module est-il activé par défaut, avant toute configuration ?
+	 *
+	 * Sert à afficher la case des réglages dans le bon état initial — voir
+	 * `SettingsTab::get_settings_for_modules_section()`.
+	 *
+	 * @return bool
+	 */
+	public function is_enabled_by_default(): bool;
+
+	/**
 	 * Accroche les hooks du module. Appelé une seule fois, si is_enabled().
 	 */
 	public function register(): void;

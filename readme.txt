@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.4.0
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 2.0.0 =
+* Nouveau module « Besoins Back in Stock » : confronte les inscriptions à une alerte de retour en stock (extension « Back In Stock Notifier for WooCommerce ») au stock libre — déjà en boutique ou commandé au fournisseur — et affiche, référence par référence, combien de demandes seront honorées, combien il en manquerait, et le taux de couverture. Désactivé par défaut, à activer depuis WooCommerce → Réglages → Stocks réels → Modules.
 
 = 1.4.0 =
 * Nouveau motif de retrait « Échange taille » sur la page « Gestion du stock ».
