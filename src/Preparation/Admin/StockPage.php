@@ -389,6 +389,7 @@ final class StockPage {
 			'casse'                   => __( 'Casse', 'real-stock-manager-for-woocommerce' ),
 			'perte'                   => __( 'Perte', 'real-stock-manager-for-woocommerce' ),
 			'retour fournisseur'      => __( 'Retour fournisseur', 'real-stock-manager-for-woocommerce' ),
+			'échange taille'          => __( 'Échange taille', 'real-stock-manager-for-woocommerce' ),
 			'correction d’inventaire' => __( 'Correction d’inventaire', 'real-stock-manager-for-woocommerce' ),
 		);
 	}
