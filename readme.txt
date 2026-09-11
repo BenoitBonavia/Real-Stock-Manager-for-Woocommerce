@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.0.0
+Stable tag: 3.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.0.1 =
+* Correctif : sur l'onglet « Inventaire », la colonne « Catégorie(s) » rendait les lignes démesurément hautes dès qu'un produit portait plusieurs catégories. Elle disparaît de l'affichage ; le filtre par catégorie continue de fonctionner normalement.
 
 = 3.0.0 =
 * Nouvel onglet « Inventaire » sur « Gestion du stock » : le catalogue entier, une ligne par produit simple ou par déclinaison, avec le stock réel et le commandé fournisseur directement modifiables. Recherche par nom/SKU, filtre par catégorie, colonnes triables — sans passer par la fiche produit un par un.
