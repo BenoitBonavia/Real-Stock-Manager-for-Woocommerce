@@ -96,7 +96,6 @@ $rsmw_report     = $data['report'];
 						<thead>
 							<tr>
 								<th data-key="name"><?php esc_html_e( 'Référence', 'real-stock-manager-for-woocommerce' ); ?></th>
-								<th class="rsmw-col-secondary"><?php esc_html_e( 'Catégorie(s)', 'real-stock-manager-for-woocommerce' ); ?></th>
 								<th class="rsmw-num" data-key="libre"><?php esc_html_e( 'Stock réel', 'real-stock-manager-for-woocommerce' ); ?></th>
 								<th class="rsmw-num" data-key="commande"><?php esc_html_e( 'Commandé', 'real-stock-manager-for-woocommerce' ); ?></th>
 							</tr>
@@ -128,13 +127,6 @@ $rsmw_report     = $data['report'];
 									<?php if ( '' !== $rsmw_row['sku'] ) : ?>
 										<br><span class="rsmw-sku"><?php echo esc_html( $rsmw_row['sku'] ); ?></span>
 									<?php endif; ?>
-								</td>
-								<td class="rsmw-col-secondary">
-									<?php
-									echo ! empty( $rsmw_row['categories'] )
-										? esc_html( implode( ', ', $rsmw_row['categories'] ) )
-										: '<span class="rsmw-zero">·</span>';
-									?>
 								</td>
 								<td class="rsmw-num">
 									<label class="screen-reader-text" for="rsmw-libre-<?php echo esc_attr( (string) $rsmw_id ); ?>">
