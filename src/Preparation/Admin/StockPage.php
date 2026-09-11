@@ -8,6 +8,7 @@
 namespace RSMW\Preparation\Admin;
 
 use RSMW\Preparation\Allocator;
+use RSMW\Preparation\Inventory;
 use RSMW\Preparation\Journal;
 use RSMW\Preparation\Labels;
 use RSMW\Preparation\Legacy;
@@ -20,8 +21,8 @@ use RSMW\Suppliers\Resolver;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Deux onglets : la réception d'un colis entier, et la console de mouvement à
- * l'unité.
+ * Trois onglets : la réception d'un colis entier, la console de mouvement à
+ * l'unité, et l'inventaire du catalogue entier.
  *
  * Les formulaires sont traités sur `load-{écran}`, avant que WordPress n'ait
  * envoyé l'en-tête de l'administration : c'est la seule fenêtre où une
@@ -37,6 +38,9 @@ final class StockPage {
 	/** Onglet de mouvement à l'unité. */
 	public const TAB_MOVEMENT = 'mouvement';
 
+	/** Onglet d'inventaire du catalogue entier. */
+	public const TAB_INVENTORY = 'inventaire';
+
 	/** Valeur du filtre fournisseur désignant les références sans fournisseur. */
 	public const SUPPLIER_NONE = 'sans-fournisseur';
 
@@ -45,6 +49,9 @@ final class StockPage {
 
 	/** Nonce du formulaire de réception. */
 	private const NONCE_RECEPTION = 'rsmw_reception';
+
+	/** Nonce du formulaire d'inventaire. */
+	private const NONCE_INVENTORY = 'rsmw_inventory';
 
 	/**
 	 * Sens autorisés pour un mouvement à l'unité.
@@ -78,7 +85,7 @@ final class StockPage {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- simple lecture de contexte d'affichage.
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : self::TAB_RECEPTION;
 
-		return in_array( $tab, array( self::TAB_RECEPTION, self::TAB_MOVEMENT ), true ) ? $tab : self::TAB_RECEPTION;
+		return in_array( $tab, array( self::TAB_RECEPTION, self::TAB_MOVEMENT, self::TAB_INVENTORY ), true ) ? $tab : self::TAB_RECEPTION;
 	}
 
 	/**
@@ -180,6 +187,15 @@ final class StockPage {
 			);
 			self::redirect( self::TAB_MOVEMENT );
 		}
+
+		if ( isset( $_POST['rsmw_inventory_submit'] ) ) {
+			check_admin_referer( self::NONCE_INVENTORY );
+
+			$report = Inventory::apply( self::read_inventory_input() );
+
+			self::flash( array( 'inventory' => $report ) );
+			self::redirect( self::TAB_INVENTORY );
+		}
 	}
 
 	/**
@@ -194,6 +210,12 @@ final class StockPage {
 
 		if ( self::TAB_MOVEMENT === self::current_tab() ) {
 			self::render_movement( $flash );
+
+			return;
+		}
+
+		if ( self::TAB_INVENTORY === self::current_tab() ) {
+			self::render_inventory( $flash );
 
 			return;
 		}
@@ -367,6 +389,27 @@ final class StockPage {
 	}
 
 	/**
+	 * Onglet « Inventaire » : le catalogue entier, stock réel et commandé
+	 * directement éditables.
+	 *
+	 * @param array $flash Compte rendu d'un enregistrement venant d'avoir lieu.
+	 */
+	private static function render_inventory( array $flash ): void {
+		View::render(
+			'inventory-page',
+			array(
+				'tab'            => self::TAB_INVENTORY,
+				'tabs'           => self::tabs(),
+				'rows'           => Inventory::all_rows(),
+				'categories'     => Inventory::categories(),
+				'report'         => isset( $flash['inventory'] ) ? $flash['inventory'] : null,
+				'nonce_field'    => wp_nonce_field( self::NONCE_INVENTORY, '_wpnonce', true, false ),
+				'needs_page_url' => admin_url( 'admin.php?page=' . Legacy::PAGE_NEEDS ),
+			)
+		);
+	}
+
+	/**
 	 * Libellés des onglets.
 	 *
 	 * @return array<string, string>
@@ -375,6 +418,7 @@ final class StockPage {
 		return array(
 			self::TAB_RECEPTION => __( 'Réception d’un colis', 'real-stock-manager-for-woocommerce' ),
 			self::TAB_MOVEMENT  => __( 'Mouvement à l’unité', 'real-stock-manager-for-woocommerce' ),
+			self::TAB_INVENTORY => __( 'Inventaire', 'real-stock-manager-for-woocommerce' ),
 		);
 	}
 
@@ -420,6 +464,44 @@ final class StockPage {
 				'ok'        => isset( $quantities['ok'] ) ? absint( $quantities['ok'] ) : 0,
 				'defective' => isset( $quantities['defective'] ) ? absint( $quantities['defective'] ) : 0,
 			);
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Lit la saisie du tableau d'inventaire.
+	 *
+	 * Le nonce est vérifié par l'appelant.
+	 *
+	 * @return array<int, array{libre?:int, commande?:int}>
+	 */
+	private static function read_inventory_input(): array {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par l'appelant.
+		$raw = isset( $_POST['rsmw_inventory'] ) ? wp_unslash( $_POST['rsmw_inventory'] ) : array();
+
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+
+		$rows = array();
+
+		foreach ( $raw as $product_id => $values ) {
+			if ( ! is_array( $values ) ) {
+				continue;
+			}
+
+			$row = array();
+
+			if ( isset( $values['libre'] ) ) {
+				$row['libre'] = absint( $values['libre'] );
+			}
+
+			if ( isset( $values['commande'] ) ) {
+				$row['commande'] = absint( $values['commande'] );
+			}
+
+			$rows[ (int) $product_id ] = $row;
 		}
 
 		return $rows;

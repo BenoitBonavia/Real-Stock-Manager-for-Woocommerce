@@ -138,7 +138,21 @@ final class Pages {
 
 		if ( $screens['stock'] === $hook_suffix ) {
 
-			// Le journal est commun aux deux onglets.
+			if ( StockPage::TAB_INVENTORY === StockPage::current_tab() ) {
+				// Pas de journal sur cet onglet : ce n'est pas un mouvement
+				// ligne à ligne, mais une correction directe en lot.
+				wp_enqueue_script(
+					'rsmw-inventory-table',
+					RSMW_URL . 'assets/js/inventory-table.js',
+					array(),
+					RSMW_VERSION,
+					array( 'in_footer' => true )
+				);
+
+				return;
+			}
+
+			// Le journal est commun aux deux autres onglets.
 			wp_enqueue_script(
 				'rsmw-journal-filter',
 				RSMW_URL . 'assets/js/journal-filter.js',

@@ -176,15 +176,40 @@ les données n'ayant bougé dans aucun sens.
 
 ### Interface
 
-La page *Gestion du stock* a deux onglets. **Réception d'un colis** liste ce qui est attendu et
+La page *Gestion du stock* a trois onglets. **Réception d'un colis** liste ce qui est attendu et
 propose deux champs par référence, conforme et défectueux, avec vérification avant écriture.
 **Mouvement à l'unité** est la console : un formulaire unique à quatre sens, et un panneau qui se
-renseigne en AJAX dès qu'une référence est choisie. Le journal, commun aux deux onglets, est
-filtrable par sens.
+renseigne en AJAX dès qu'une référence est choisie. **Inventaire** liste le catalogue entier —
+voir plus bas. Le journal, commun aux deux premiers onglets, est filtrable par sens ; l'Inventaire
+n'en a pas (voir la raison ci-dessous).
 
 Les formulaires sont traités sur `load-{écran}`, avant l'envoi de l'en-tête d'administration —
 seule fenêtre où une redirection reste possible. Sans elle, un rafraîchissement rejouerait
 l'écriture, et sur une réception en lot c'est un colis entier qui serait enregistré deux fois.
+
+### Inventaire : correction directe, pas un mouvement
+
+Les deux autres onglets sont **demand-driven** : ils ne listent que des références déjà engagées
+dans une commande client ou fournisseur. L'onglet Inventaire (`RSMW\Preparation\Inventory`) est le
+premier écran du plugin à parcourir le **catalogue entier** — un produit simple par ligne, une
+ligne par déclinaison pour un produit à variations, jamais le produit variable parent lui-même.
+Aucune fonction WooCommerce ne permet de mélanger `product` et `product_variation` dans un seul
+appel : la liste vient d'une requête SQL directe sur `wp_posts`, dans l'esprit de
+`BackInStock\Demand`.
+
+C'est une correction **directe** de la valeur affichée, au même titre que les champs « Stock
+physique libre » / « Commandé au fournisseur » de la fiche produit (`ProductFields`) — pas un
+mouvement : aucun passage par `Allocator` (pas de sens, pas de réaffectation FIFO aux commandes
+clients), aucune entrée au journal ligne par ligne. `Inventory::apply()` n'écrit **que les valeurs
+qui diffèrent réellement** de celles en base, un seul `Log::info()` récapitulatif à la fin — le
+formulaire soumet tout le catalogue à chaque enregistrement, filtré ou non côté client, et la
+quasi-totalité des lignes n'aura pas été touchée.
+
+Catalogue de quelques centaines de références ou moins : recherche, filtre par catégorie
+(`product_cat`) et tri se font entièrement côté navigateur (`assets/js/inventory-table.js`), sans
+pagination — le même principe que `needs-table.js` pour « Besoins pour commande ». Les catégories
+sont résolues en une seule requête groupée (`wp_get_object_terms()`), jamais `get_the_terms()`
+par ligne : `Labels::prime()` n'amorce aucune taxonomie, seulement les posts et leurs métadonnées.
 
 ### Réception : ce qu'un défectueux ne doit pas faire
 
