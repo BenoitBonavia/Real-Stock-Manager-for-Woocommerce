@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.2.0
+Stable tag: 3.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,10 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.2.1 =
+* Performance : le vérificateur de mises à jour ne se charge plus sur les pages de la boutique (fiche produit, panier…), seulement en administration ou lors de la vérification programmée — il ne servait à rien côté visiteur.
+* Performance : le marqueur de version installée est désormais chargé avec le reste des réglages au lieu de coûter une requête SQL dédiée à chaque page vue, front compris.
 
 = 3.2.0 =
 * Une vignette produit précède désormais chaque ligne de l'onglet « Inventaire » — la même image que sur la fiche produit, avec le même repli automatique (image du produit parent pour une variation qui n'en a pas, puis le placeholder WooCommerce).

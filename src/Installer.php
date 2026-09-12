@@ -62,7 +62,15 @@ final class Installer {
 	 *
 	 * Volontairement publique et idempotente : WordPress n'exécute pas le hook
 	 * d'activation lors d'une mise à jour de plugin, elle doit donc pouvoir être
-	 * appelée depuis une requête ordinaire (cf. Plugin::boot).
+	 * appelée depuis une requête ordinaire (cf. Plugin::boot) — donc à CHAQUE
+	 * requête, front compris.
+	 *
+	 * Autoload à `true`, volontairement : l'option est minuscule (une chaîne de
+	 * version) et lue à chaque requête. Autoloadée, elle voyage gratuitement
+	 * dans le cache `alloptions` déjà chargé par WordPress ; sans autoload,
+	 * `get_option()` ci-dessous coûterait une requête SQL dédiée par page vue,
+	 * y compris sur le front, pour comparer une valeur qui ne change qu'une
+	 * fois par mise à jour du plugin.
 	 */
 	public static function maybe_upgrade(): void {
 		$installed = (string) get_option( self::VERSION_OPTION, '' );
@@ -78,6 +86,6 @@ final class Installer {
 		 */
 		do_action( 'rsmw_upgrade', $installed );
 
-		update_option( self::VERSION_OPTION, RSMW_VERSION, false );
+		update_option( self::VERSION_OPTION, RSMW_VERSION, true );
 	}
 }

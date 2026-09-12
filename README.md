@@ -642,6 +642,11 @@ Configuration dans `src/Updater.php` :
 Le vérificateur est branché **avant** le contrôle des prérequis WooCommerce : si WooCommerce
 venait à manquer, le site doit rester capable de recevoir un correctif.
 
+`Updater::register()` n'est en revanche appelé (`src/Plugin.php`) que si `is_admin()`,
+`wp_doing_cron()` ou `WP_CLI` — jamais sur une requête boutique ordinaire. Charger et instancier
+toute la bibliothèque à chaque vue de fiche produit ou de panier n'aurait servi à rien : seuls
+l'écran Extensions et la vérification programmée par WP-Cron en tirent parti.
+
 ### Règle absolue : le tag ne fait pas la version
 
 La bibliothèque lit l'en-tête `Version:` du fichier principal **tel qu'il est dans le tag distant**.

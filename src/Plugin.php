@@ -71,8 +71,19 @@ final class Plugin {
 		 * Les mises à jour sont branchées AVANT le contrôle des prérequis : si
 		 * WooCommerce venait à manquer, le site doit rester capable de recevoir
 		 * un correctif du plugin.
+		 *
+		 * En revanche, rien de tout cela ne sert à un visiteur de la boutique :
+		 * la bibliothèque de mise à jour ne fait quelque chose d'utile qu'en
+		 * admin (écran Extensions) ou lors de la vérification programmée par
+		 * WP-Cron. Sans cette garde, chaque page vue côté front chargeait et
+		 * instanciait toute la bibliothèque pour rien. `wp_doing_cron()`
+		 * couvre la requête pseudo-cron qui exécute la vérification
+		 * programmée ; `WP_CLI` couvre `wp plugin update`/`wp plugin list`,
+		 * qui s'exécutent hors admin et hors cron.
 		 */
-		Updater::register();
+		if ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+			Updater::register();
+		}
 
 		/*
 		 * Reprise de la configuration du snippet remplacé.
