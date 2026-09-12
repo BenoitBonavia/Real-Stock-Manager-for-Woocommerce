@@ -228,6 +228,14 @@ qui dépend des réglages Médias et n'est pas garantie carrée. Cette méthode 
 repli sur l'image du produit parent pour une variation qui n'en a pas, puis sur le placeholder
 WooCommerce : aucune logique de repli à écrire côté plugin.
 
+Une dernière colonne, **« Déjà attribué »**, est en LECTURE SEULE — volontairement, contrairement
+aux trois autres. Elle reprend `pointe` de `Demand::map()` (`src/Preparation/Demand.php`), la
+même donnée que la colonne « Pointé » de « Besoins pour commande » : ce qui est déjà prélevé sur
+des commandes clients en attente. Ni « Stock réel » ni « Commandé » ne l'incluent — les deux ne
+comptent que le libre — donc l'afficher à part évite de laisser croire qu'une référence est vide
+alors qu'elle est simplement déjà engagée. La rendre éditable n'aurait pas de sens : ce nombre se
+déduit des commandes, il ne se corrige pas à la main.
+
 ### Réception : ce qu'un défectueux ne doit pas faire
 
 Un article reçu défectueux **n'entre jamais en stock pour en ressortir aussitôt**. L'aller-retour

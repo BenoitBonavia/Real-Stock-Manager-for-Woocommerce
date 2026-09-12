@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.2.1
+Stable tag: 3.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.3.0 =
+* L'onglet « Inventaire » gagne une colonne « Déjà attribué », juste avant le stock WooCommerce : ce qui est déjà prélevé sur des commandes clients en attente, en lecture seule — ni le stock réel ni le commandé fournisseur ne l'incluent.
 
 = 3.2.1 =
 * Performance : le vérificateur de mises à jour ne se charge plus sur les pages de la boutique (fiche produit, panier…), seulement en administration ou lors de la vérification programmée — il ne servait à rien côté visiteur.

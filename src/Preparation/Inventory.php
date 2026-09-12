@@ -1,7 +1,7 @@
 <?php
 /**
- * Vue d'ensemble du catalogue : stock réel, commandé et stock WooCommerce,
- * par référence.
+ * Vue d'ensemble du catalogue : déjà attribué, stock réel, commandé et stock
+ * WooCommerce, par référence.
  *
  * @package RealStockManager
  */
@@ -80,6 +80,10 @@ final class Inventory {
 
 		$categories = self::categories_by_product( array_values( array_unique( $parents ) ) );
 
+		// Recalcul systématique, sans cache : comme sur « Besoins pour commande »,
+		// l'écran doit refléter l'état réel des commandes clients.
+		$demand = Demand::map( false );
+
 		$rows = array();
 
 		foreach ( $ids as $id ) {
@@ -108,6 +112,11 @@ final class Inventory {
 				'thumbnail'      => $product->get_image( 'woocommerce_thumbnail', array( 'class' => 'rsmw-thumb' ) ),
 				'libre'          => Stock::get( $id ),
 				'commande'       => Supply::get( $id ),
+				// Lecture seule : déjà pointé (prélevé) sur des commandes
+				// clients en attente — voir la colonne « Pointé » de « Besoins
+				// pour commande ». Ni « Stock réel » ni « Commandé » ci-dessus
+				// ne l'incluent, les deux ne comptant que le libre.
+				'attribue'       => isset( $demand[ $id ]['pointe'] ) ? (int) $demand[ $id ]['pointe'] : 0,
 				'woo_managed'    => null !== $woo_stock,
 				'woo_stock'      => $woo_stock,
 				'categories'     => wp_list_pluck( $terms, 'name' ),
