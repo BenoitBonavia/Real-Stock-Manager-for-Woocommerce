@@ -211,6 +211,17 @@ pagination — le même principe que `needs-table.js` pour « Besoins pour comma
 sont résolues en une seule requête groupée (`wp_get_object_terms()`), jamais `get_the_terms()`
 par ligne : `Labels::prime()` n'amorce aucune taxonomie, seulement les posts et leurs métadonnées.
 
+Une troisième colonne modifiable porte le **stock WooCommerce** — celui qui gouverne « en stock » /
+« rupture » côté client, distinct des deux compteurs internes du plugin. Une variation peut suivre
+sa propre quantité, ou l'hériter de son produit parent (stock mutualisé entre déclinaisons,
+réglage « Gérer le stock ? » laissé sur « Parent » côté variation) : `Inventory::woo_stock_for()`
+résout cette indirection avec `WC_Product::get_stock_managed_by_id()`, la même méthode
+qu'utilise `wc_update_product_stock()` en écriture — lecture et écriture visent donc toujours le
+même compteur. Une référence qui ne suit aucun stock affiche un tiret, jamais un champ : ce
+tableau ne pose jamais `manage_stock` à la volée. La cellule passe en rouge dès que la quantité
+tombe à zéro ou en dessous, y compris pendant la saisie (`assets/js/inventory-table.js`), puisque
+c'est ce chiffre qui décide de ce que le client voit.
+
 ### Réception : ce qu'un défectueux ne doit pas faire
 
 Un article reçu défectueux **n'entre jamais en stock pour en ressortir aussitôt**. L'aller-retour

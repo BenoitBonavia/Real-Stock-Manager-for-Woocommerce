@@ -1,6 +1,7 @@
 <?php
 /**
- * Vue d'ensemble du catalogue : stock réel et commandé, par référence.
+ * Vue d'ensemble du catalogue : stock réel, commandé et stock WooCommerce,
+ * par référence.
  *
  * @package RealStockManager
  */
@@ -82,8 +83,9 @@ final class Inventory {
 		$rows = array();
 
 		foreach ( $ids as $id ) {
-			$info  = Labels::get( $id );
-			$terms = isset( $categories[ $parents[ $id ] ] ) ? $categories[ $parents[ $id ] ] : array();
+			$info      = Labels::get( $id );
+			$terms     = isset( $categories[ $parents[ $id ] ] ) ? $categories[ $parents[ $id ] ] : array();
+			$woo_stock = self::woo_stock_for( $id );
 
 			$rows[] = array(
 				'id'             => $id,
@@ -93,6 +95,8 @@ final class Inventory {
 				'edit'           => $info['edit'],
 				'libre'          => Stock::get( $id ),
 				'commande'       => Supply::get( $id ),
+				'woo_managed'    => null !== $woo_stock,
+				'woo_stock'      => $woo_stock,
 				'categories'     => wp_list_pluck( $terms, 'name' ),
 				'category_slugs' => wp_list_pluck( $terms, 'slug' ),
 			);
@@ -106,6 +110,67 @@ final class Inventory {
 		);
 
 		return $rows;
+	}
+
+	/**
+	 * Écrit le stock WooCommerce si la référence gère bien un stock, et si la
+	 * valeur saisie diffère réellement de celle en base.
+	 *
+	 * Ne pose jamais `manage_stock` à la volée : une référence qui ne suit pas
+	 * son stock aujourd'hui n'a pas de champ modifiable pour ce compteur (voir
+	 * le gabarit), donc `$quantity` ne peut arriver ici que pour une référence
+	 * déjà suivie.
+	 *
+	 * @param int $product_id Produit ou variation.
+	 * @param int $quantity   Quantité saisie.
+	 *
+	 * @return bool Une écriture a-t-elle eu lieu ?
+	 */
+	private static function apply_woo_stock( int $product_id, int $quantity ): bool {
+		$current = self::woo_stock_for( $product_id );
+
+		if ( null === $current || $quantity === $current ) {
+			return false;
+		}
+
+		// `wc_update_product_stock()` résout elle-même l'indirection vers le
+		// parent quand le stock est mutualisé entre variations, recalcule le
+		// statut « en stock »/« rupture », et enregistre le produit.
+		wc_update_product_stock( $product_id, $quantity, 'set' );
+
+		return true;
+	}
+
+	/**
+	 * Stock WooCommerce affiché au client, celui qui gouverne « en stock » /
+	 * « rupture » sur la boutique — distinct du stock réel interne au plugin.
+	 *
+	 * Une variation peut suivre sa PROPRE quantité, ou hériter de celle de son
+	 * produit parent (réglage « Gérer le stock ? » laissé sur « Parent » côté
+	 * variation, quantité mutualisée entre toutes les déclinaisons).
+	 * `get_stock_managed_by_id()` résout cette indirection — c'est la même
+	 * méthode que `wc_update_product_stock()` utilise en écriture, ce qui
+	 * garantit que lecture et écriture visent toujours le même compteur.
+	 *
+	 * @param int $id Produit ou variation.
+	 *
+	 * @return int|null `null` si aucun stock n'est géré pour cette référence.
+	 */
+	private static function woo_stock_for( int $id ): ?int {
+		$product = wc_get_product( $id );
+
+		if ( ! $product ) {
+			return null;
+		}
+
+		$managed_id = $product->get_stock_managed_by_id();
+		$managed    = $managed_id === $id ? $product : wc_get_product( $managed_id );
+
+		if ( ! $managed || ! $managed->managing_stock() ) {
+			return null;
+		}
+
+		return (int) $managed->get_stock_quantity();
 	}
 
 	/**
@@ -138,7 +203,7 @@ final class Inventory {
 	 * formulaire soumet TOUTES les références, filtrées ou non côté client, et
 	 * la grande majorité n'aura pas été touchée.
 	 *
-	 * @param array<int, array{libre?:int, commande?:int}> $rows Saisie, indexée par référence.
+	 * @param array<int, array{libre?:int, commande?:int, woo?:int}> $rows Saisie, indexée par référence.
 	 *
 	 * @return array{changed:int}
 	 */
@@ -170,6 +235,10 @@ final class Inventory {
 					Supply::set( $product_id, $commande );
 					$touched = true;
 				}
+			}
+
+			if ( isset( $values['woo'] ) && self::apply_woo_stock( $product_id, (int) $values['woo'] ) ) {
+				$touched = true;
 			}
 
 			if ( $touched ) {

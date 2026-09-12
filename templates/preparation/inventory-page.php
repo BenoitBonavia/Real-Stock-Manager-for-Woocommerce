@@ -50,7 +50,7 @@ $rsmw_report     = $data['report'];
 	<?php endif; ?>
 
 	<p class="description">
-		<?php esc_html_e( 'Le catalogue entier — un produit simple par ligne, une ligne par déclinaison pour un produit à variations. Le stock réel et le commandé fournisseur sont modifiables directement ; seules les lignes réellement changées sont enregistrées.', 'real-stock-manager-for-woocommerce' ); ?>
+		<?php esc_html_e( 'Le catalogue entier — un produit simple par ligne, une ligne par déclinaison pour un produit à variations. Stock réel, commandé fournisseur et stock WooCommerce (celui affiché au client) sont modifiables directement ; seules les valeurs réellement changées sont enregistrées.', 'real-stock-manager-for-woocommerce' ); ?>
 	</p>
 
 	<?php if ( empty( $rsmw_rows ) ) : ?>
@@ -98,6 +98,10 @@ $rsmw_report     = $data['report'];
 								<th data-key="name"><?php esc_html_e( 'Référence', 'real-stock-manager-for-woocommerce' ); ?></th>
 								<th class="rsmw-num" data-key="libre"><?php esc_html_e( 'Stock réel', 'real-stock-manager-for-woocommerce' ); ?></th>
 								<th class="rsmw-num" data-key="commande"><?php esc_html_e( 'Commandé', 'real-stock-manager-for-woocommerce' ); ?></th>
+								<th class="rsmw-num" data-key="woo"
+									title="<?php esc_attr_e( 'Stock WooCommerce : celui qui gouverne « en stock » / « rupture » côté client', 'real-stock-manager-for-woocommerce' ); ?>">
+									<?php esc_html_e( 'Stock WooCommerce', 'real-stock-manager-for-woocommerce' ); ?>
+								</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -114,7 +118,8 @@ $rsmw_report     = $data['report'];
 								data-name="<?php echo esc_attr( trim( $rsmw_row['name'] . ' ' . $rsmw_row['variant'] ) ); ?>"
 								data-categories="<?php echo esc_attr( implode( ' ', $rsmw_row['category_slugs'] ) ); ?>"
 								data-libre="<?php echo esc_attr( (string) $rsmw_row['libre'] ); ?>"
-								data-commande="<?php echo esc_attr( (string) $rsmw_row['commande'] ); ?>">
+								data-commande="<?php echo esc_attr( (string) $rsmw_row['commande'] ); ?>"
+								data-woo="<?php echo esc_attr( $rsmw_row['woo_managed'] ? (string) $rsmw_row['woo_stock'] : '' ); ?>">
 								<td>
 									<?php if ( '' !== $rsmw_row['edit'] ) : ?>
 										<strong><a href="<?php echo esc_url( $rsmw_row['edit'] ); ?>"><?php echo esc_html( $rsmw_row['name'] ); ?></a></strong>
@@ -147,6 +152,20 @@ $rsmw_report     = $data['report'];
 										id="rsmw-commande-<?php echo esc_attr( (string) $rsmw_id ); ?>"
 										name="rsmw_inventory[<?php echo esc_attr( (string) $rsmw_id ); ?>][commande]"
 										value="<?php echo esc_attr( (string) $rsmw_row['commande'] ); ?>">
+								</td>
+								<td class="rsmw-num">
+									<?php if ( $rsmw_row['woo_managed'] ) : ?>
+										<label class="screen-reader-text" for="rsmw-woo-<?php echo esc_attr( (string) $rsmw_id ); ?>">
+											<?php esc_html_e( 'Stock WooCommerce', 'real-stock-manager-for-woocommerce' ); ?>
+										</label>
+										<input type="number" step="1"
+											class="rsmw-field__input--qty rsmw-inventory__woo <?php echo $rsmw_row['woo_stock'] <= 0 ? 'rsmw-lack' : ''; ?>"
+											id="rsmw-woo-<?php echo esc_attr( (string) $rsmw_id ); ?>"
+											name="rsmw_inventory[<?php echo esc_attr( (string) $rsmw_id ); ?>][woo]"
+											value="<?php echo esc_attr( (string) $rsmw_row['woo_stock'] ); ?>">
+									<?php else : ?>
+										<span class="rsmw-zero" title="<?php esc_attr_e( 'Cette référence ne suit pas de quantité WooCommerce.', 'real-stock-manager-for-woocommerce' ); ?>">·</span>
+									<?php endif; ?>
 								</td>
 							</tr>
 						<?php endforeach; ?>

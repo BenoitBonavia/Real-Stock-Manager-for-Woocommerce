@@ -474,7 +474,7 @@ final class StockPage {
 	 *
 	 * Le nonce est vérifié par l'appelant.
 	 *
-	 * @return array<int, array{libre?:int, commande?:int}>
+	 * @return array<int, array{libre?:int, commande?:int, woo?:int}>
 	 */
 	private static function read_inventory_input(): array {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par l'appelant.
@@ -499,6 +499,12 @@ final class StockPage {
 
 			if ( isset( $values['commande'] ) ) {
 				$row['commande'] = absint( $values['commande'] );
+			}
+
+			// Signé, contrairement aux deux autres : WooCommerce autorise un
+			// stock négatif quand le retard de commande (backorder) est permis.
+			if ( isset( $values['woo'] ) ) {
+				$row['woo'] = (int) $values['woo'];
 			}
 
 			$rows[ (int) $product_id ] = $row;

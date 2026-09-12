@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.0.1
+Stable tag: 3.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,10 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.1.0 =
+* L'onglet « Inventaire » gagne une troisième colonne modifiable : le stock WooCommerce, celui qui gouverne « en stock » / « rupture » pour le client — distinct du stock réel et du commandé fournisseur, propres au plugin. Une variation dont le stock est mutualisé au niveau du produit parent affiche et modifie la bonne quantité, celle réellement décrémentée par les commandes.
+* La cellule passe en rouge dès que ce stock tombe à zéro ou en dessous, y compris pendant la saisie.
 
 = 3.0.1 =
 * Correctif : sur l'onglet « Inventaire », la colonne « Catégorie(s) » rendait les lignes démesurément hautes dès qu'un produit portait plusieurs catégories. Elle disparaît de l'affichage ; le filtre par catégorie continue de fonctionner normalement.

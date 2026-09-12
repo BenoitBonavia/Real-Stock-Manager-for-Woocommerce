@@ -78,4 +78,18 @@
 			} );
 		} );
 	} );
+
+	/*
+	 * Rouge dès que le stock WooCommerce tombe à zéro ou en dessous — pas
+	 * seulement à l'affichage initial, aussi pendant la saisie : c'est ce
+	 * chiffre qui gouverne « en stock » / « rupture » côté client, la
+	 * correction doit rester visible tant qu'elle n'est pas enregistrée.
+	 */
+	table.querySelectorAll( '.rsmw-inventory__woo' ).forEach( function ( input ) {
+		input.addEventListener( 'input', function () {
+			var value = parseInt( input.value, 10 );
+
+			input.classList.toggle( 'rsmw-lack', ! isNaN( value ) && value <= 0 );
+		} );
+	} );
 }() );
