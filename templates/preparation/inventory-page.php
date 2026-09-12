@@ -95,6 +95,7 @@ $rsmw_report     = $data['report'];
 					<table class="rsmw-table" id="rsmw-inventory-table">
 						<thead>
 							<tr>
+								<th class="rsmw-thumb-col"><span class="screen-reader-text"><?php esc_html_e( 'Image', 'real-stock-manager-for-woocommerce' ); ?></span></th>
 								<th data-key="name"><?php esc_html_e( 'Référence', 'real-stock-manager-for-woocommerce' ); ?></th>
 								<th class="rsmw-num" data-key="libre"><?php esc_html_e( 'Stock réel', 'real-stock-manager-for-woocommerce' ); ?></th>
 								<th class="rsmw-num" data-key="commande"><?php esc_html_e( 'Commandé', 'real-stock-manager-for-woocommerce' ); ?></th>
@@ -120,6 +121,9 @@ $rsmw_report     = $data['report'];
 								data-libre="<?php echo esc_attr( (string) $rsmw_row['libre'] ); ?>"
 								data-commande="<?php echo esc_attr( (string) $rsmw_row['commande'] ); ?>"
 								data-woo="<?php echo esc_attr( $rsmw_row['woo_managed'] ? (string) $rsmw_row['woo_stock'] : '' ); ?>">
+								<td class="rsmw-thumb-cell">
+									<?php echo wp_kses_post( $rsmw_row['thumbnail'] ); ?>
+								</td>
 								<td>
 									<?php if ( '' !== $rsmw_row['edit'] ) : ?>
 										<strong><a href="<?php echo esc_url( $rsmw_row['edit'] ); ?>"><?php echo esc_html( $rsmw_row['name'] ); ?></a></strong>

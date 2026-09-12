@@ -760,6 +760,35 @@
 }
 
 /*
+ * Inventaire : une vignette précède la référence, ce qui décale d'un cran la
+ * colonne élastique ci-dessus. Un sélecteur d'ID l'emporte sur celui-là quel
+ * que soit l'ordre des règles dans la feuille, plutôt que de dépendre de la
+ * position du bloc.
+ */
+#rsmw-inventory-table th:first-child {
+	width: 40px;
+	min-width: 40px;
+}
+
+#rsmw-inventory-table th:nth-child(2) {
+	width: 100%;
+	min-width: 200px;
+}
+
+.rsmw-table td.rsmw-thumb-cell {
+	padding-right: 0;
+}
+
+.rsmw-thumb {
+	display: block;
+	width: 40px;
+	height: 40px;
+	object-fit: cover;
+	border-radius: var(--rsmw-radius-sm);
+	background: var(--rsmw-canvas);
+}
+
+/*
  * Un nom de fournisseur long ne doit pas repousser les chiffres hors de l'écran.
  * Le nom complet reste lisible au survol, et la recherche continue de le trouver
  * puisqu'elle lit data-search, pas la cellule.

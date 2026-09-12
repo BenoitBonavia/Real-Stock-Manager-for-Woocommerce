@@ -83,9 +83,15 @@ final class Inventory {
 		$rows = array();
 
 		foreach ( $ids as $id ) {
+			$product = wc_get_product( $id );
+
+			if ( ! $product ) {
+				continue;
+			}
+
 			$info      = Labels::get( $id );
 			$terms     = isset( $categories[ $parents[ $id ] ] ) ? $categories[ $parents[ $id ] ] : array();
-			$woo_stock = self::woo_stock_for( $id );
+			$woo_stock = self::woo_stock_for( $product );
 
 			$rows[] = array(
 				'id'             => $id,
@@ -93,6 +99,13 @@ final class Inventory {
 				'variant'        => $info['variant'],
 				'sku'            => $info['sku'],
 				'edit'           => $info['edit'],
+				// Taille de vignette carrée de WooCommerce, jamais 'thumbnail' :
+				// cette dernière dépend des réglages Médias de WordPress et n'est
+				// pas garantie carrée, contrairement à 'woocommerce_thumbnail'
+				// (recadrage forcé). `get_image()` retombe elle-même sur le
+				// placeholder WooCommerce si le produit n'a pas d'image — même
+				// logique que sur sa fiche.
+				'thumbnail'      => $product->get_image( 'woocommerce_thumbnail', array( 'class' => 'rsmw-thumb' ) ),
 				'libre'          => Stock::get( $id ),
 				'commande'       => Supply::get( $id ),
 				'woo_managed'    => null !== $woo_stock,
@@ -127,7 +140,8 @@ final class Inventory {
 	 * @return bool Une écriture a-t-elle eu lieu ?
 	 */
 	private static function apply_woo_stock( int $product_id, int $quantity ): bool {
-		$current = self::woo_stock_for( $product_id );
+		$product = wc_get_product( $product_id );
+		$current = $product ? self::woo_stock_for( $product ) : null;
 
 		if ( null === $current || $quantity === $current ) {
 			return false;
@@ -152,19 +166,13 @@ final class Inventory {
 	 * méthode que `wc_update_product_stock()` utilise en écriture, ce qui
 	 * garantit que lecture et écriture visent toujours le même compteur.
 	 *
-	 * @param int $id Produit ou variation.
+	 * @param \WC_Product $product Produit ou variation, déjà chargé.
 	 *
 	 * @return int|null `null` si aucun stock n'est géré pour cette référence.
 	 */
-	private static function woo_stock_for( int $id ): ?int {
-		$product = wc_get_product( $id );
-
-		if ( ! $product ) {
-			return null;
-		}
-
+	private static function woo_stock_for( \WC_Product $product ): ?int {
 		$managed_id = $product->get_stock_managed_by_id();
-		$managed    = $managed_id === $id ? $product : wc_get_product( $managed_id );
+		$managed    = $managed_id === $product->get_id() ? $product : wc_get_product( $managed_id );
 
 		if ( ! $managed || ! $managed->managing_stock() ) {
 			return null;
