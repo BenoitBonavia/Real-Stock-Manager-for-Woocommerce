@@ -222,6 +222,12 @@ tableau ne pose jamais `manage_stock` à la volée. La cellule passe en rouge d�
 tombe à zéro ou en dessous, y compris pendant la saisie (`assets/js/inventory-table.js`), puisque
 c'est ce chiffre qui décide de ce que le client voit.
 
+Chaque ligne s'ouvre sur une vignette carrée, la même que sur la fiche produit :
+`WC_Product::get_image( 'woocommerce_thumbnail' )` — jamais la taille `thumbnail` de WordPress,
+qui dépend des réglages Médias et n'est pas garantie carrée. Cette méthode gère elle-même le
+repli sur l'image du produit parent pour une variation qui n'en a pas, puis sur le placeholder
+WooCommerce : aucune logique de repli à écrire côté plugin.
+
 ### Réception : ce qu'un défectueux ne doit pas faire
 
 Un article reçu défectueux **n'entre jamais en stock pour en ressortir aussitôt**. L'aller-retour
