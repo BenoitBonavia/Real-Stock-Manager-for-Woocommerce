@@ -7,6 +7,7 @@
 
 namespace RSMW\Preparation\Admin;
 
+use RSMW\Preparation\Config;
 use RSMW\Preparation\Items;
 use RSMW\Preparation\Labels;
 use RSMW\Preparation\Legacy;
@@ -136,11 +137,18 @@ final class Metabox {
 
 		$percent = $total > 0 ? (int) round( $done / $total * 100 ) : 0;
 
+		// Même périmètre que le garde-fou côté Ajax::handle() : au-delà, un
+		// pointage écrirait du stock devenu irrécupérable (ni active_order_ids()
+		// ni holder_order_ids() ne verraient plus la commande). La métabox passe
+		// donc en lecture seule plutôt que de compter uniquement sur le serveur.
+		$in_scope = in_array( $order->get_status(), array_merge( Config::statuses(), array( Legacy::STATUS_SLUG ) ), true );
+
 		View::render(
 			'metabox',
 			array(
 				'order_id'        => $order->get_id(),
-				'nonce'           => wp_create_nonce( Legacy::AJAX_NONCE ),
+				'nonce'           => wp_create_nonce( Ajax::nonce_action( $order->get_id() ) ),
+				'in_scope'        => $in_scope,
 				'done'            => $done,
 				'ordered'         => $ordered_total,
 				'total'           => $total,

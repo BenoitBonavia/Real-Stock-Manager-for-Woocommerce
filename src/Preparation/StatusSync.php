@@ -87,17 +87,43 @@ final class StatusSync {
 		}
 
 		if ( ! $ready && Legacy::STATUS_SLUG === $status ) {
-			$previous = $order->get_meta( Legacy::PREV_STATUS_META );
+			/*
+			 * Le statut de retour mémorisé reste légitime même s'il est sorti
+			 * entre-temps du périmètre courant (réglage modifié) : c'est le statut
+			 * réel qu'avait la commande, pas une valeur à revalider contre la
+			 * configuration du moment. On ne retombe sur une valeur arbitraire que
+			 * si la meta est absente ou pointe vers un statut qui n'existe même
+			 * plus chez WooCommerce.
+			 */
+			$previous = (string) $order->get_meta( Legacy::PREV_STATUS_META );
+			$known    = wc_get_order_statuses();
+			$fallback = '' === $previous || ! isset( $known[ 'wc-' . $previous ] );
 
-			if ( ! $previous || ! in_array( $previous, $actives, true ) ) {
-				$previous = $actives ? $actives[0] : 'processing';
+			if ( $fallback ) {
+				$previous = Config::DEFAULT_STATUSES[0];
 			}
+
+			// Suppression mise en file, persistée par le save() d'apply_status().
+			$order->delete_meta_data( Legacy::PREV_STATUS_META );
 
 			self::apply_status(
 				$order,
 				$previous,
 				__( 'Une ligne n’est plus complète.', 'real-stock-manager-for-woocommerce' )
 			);
+
+			if ( $fallback ) {
+				// Écrit systématiquement : une commande vient d'atterrir dans un
+				// statut que personne n'a choisi pour elle, ce n'est pas un simple
+				// événement de confort.
+				Log::error(
+					sprintf(
+						'Commande %d : aucun statut de retour valide, repli sur %s.',
+						$order->get_id(),
+						$previous
+					)
+				);
+			}
 
 			Log::info( sprintf( 'Commande %d → retour %s.', $order->get_id(), $previous ) );
 

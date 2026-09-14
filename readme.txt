@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.3.0
+Stable tag: 3.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,14 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.4.0 =
+* Correctif : dépointer une ligne depuis la fiche commande d'une commande « À empaqueter » n'avait aucun effet visible — le stock repris était aussitôt réattribué automatiquement, avec un message annonçant à tort un retour à un statut antérieur.
+* Correctif : une commande entièrement pointée qui revenait dans le périmètre de préparation (après un aller-retour de statut, par exemple) ne basculait plus jamais en « À empaqueter ».
+* Correctif : au dépointage d'une commande « À empaqueter », le statut de retour pouvait tomber sur une valeur arbitraire plutôt que sur le statut réel de la commande — avec le risque, si « En attente de paiement » fait partie des statuts suivis, qu'une commande payée soit annulée automatiquement par WooCommerce.
+* Correctif : une commande contenant un produit téléchargeable perdait l'accès à ses fichiers dès sa bascule automatique en « À empaqueter », une transition pourtant censée rester invisible du client.
+* Correctif : le pointage depuis la fiche commande est désormais limité aux commandes suivies par le module et vérifié ligne par ligne, plutôt que d'accepter n'importe quel identifiant de ligne.
+* Correctif : un retrait de stock à l'unité pouvait, sur une ligne dont la quantité avait été réduite après pointage, écarter plus d'unités que demandé sans que le compte rendu ne le signale.
 
 = 3.3.0 =
 * L'onglet « Inventaire » gagne une colonne « Déjà attribué », juste avant le stock WooCommerce : ce qui est déjà prélevé sur des commandes clients en attente, en lecture seule — ni le stock réel ni le commandé fournisseur ne l'incluent.

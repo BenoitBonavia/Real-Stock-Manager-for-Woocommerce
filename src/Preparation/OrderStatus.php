@@ -32,6 +32,7 @@ final class OrderStatus {
 		add_filter( 'wc_order_statuses', array( __CLASS__, 'add_to_order_statuses' ) );
 		add_filter( 'woocommerce_order_is_paid_statuses', array( __CLASS__, 'add_to_paid_statuses' ) );
 		add_filter( 'woocommerce_reports_order_statuses', array( __CLASS__, 'add_to_report_statuses' ) );
+		add_filter( 'woocommerce_order_is_download_permitted', array( __CLASS__, 'allow_downloads' ), 10, 2 );
 
 		foreach ( array( 'bulk_actions-woocommerce_page_wc-orders', 'bulk_actions-edit-shop_order' ) as $hook ) {
 			add_filter( $hook, array( __CLASS__, 'add_bulk_action' ) );
@@ -50,6 +51,33 @@ final class OrderStatus {
 	 */
 	public static function label(): string {
 		return _x( 'À empaqueter', 'Statut de commande', 'real-stock-manager-for-woocommerce' );
+	}
+
+	/**
+	 * Accorde les téléchargements comme si la commande était « En cours ».
+	 *
+	 * `WC_Order::is_download_permitted()` teste « Terminée » ou « En cours » en
+	 * dur, sans passer par une liste filtrable : une commande « À empaqueter »
+	 * perdrait donc l'accès aux fichiers pendant toute la préparation — une
+	 * transition censée être invisible du client. Réplique exactement la règle
+	 * de « En cours », option de la boutique comprise. Même logique que
+	 * `PreOrder\OrderStatus::allow_downloads()` pour son propre statut.
+	 *
+	 * @param bool            $permitted Décision de WooCommerce.
+	 * @param \WC_Order|mixed $order     Commande.
+	 *
+	 * @return bool
+	 */
+	public static function allow_downloads( $permitted, $order ) {
+		if ( $permitted || ! $order instanceof \WC_Order ) {
+			return $permitted;
+		}
+
+		if ( ! $order->has_status( Legacy::STATUS_SLUG ) ) {
+			return $permitted;
+		}
+
+		return 'yes' === get_option( 'woocommerce_downloads_grant_access_after_payment' );
 	}
 
 	/**

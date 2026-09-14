@@ -201,21 +201,28 @@ final class Allocator {
 		self::$in_progress[ $key ] = true;
 
 		try {
-			$served = self::allocate_order( $order );
+			self::allocate_order( $order );
 
 			/*
-			 * Passe fournisseur, volontairement hors du test de bascule qui suit :
-			 * réserver de la marchandise en route ne rend pas une commande prête
-			 * à empaqueter. Seule la passe physique peut déclencher la bascule.
+			 * Passe fournisseur : réserver de la marchandise en route ne rend pas
+			 * une commande prête à empaqueter, mais cela ne change rien à l'ordre —
+			 * order_is_ready(), lu par sync() ci-dessous, ne regarde que le stock
+			 * physique pointé, jamais la réserve fournisseur.
 			 */
 			self::allocate_ordered_to_order( $order );
 
-			if ( $served > 0 ) {
-				$fresh = wc_get_order( $key );
+			/*
+			 * Synchronisation inconditionnelle : sync() est idempotente et sort
+			 * sans écrire si rien ne change (StatusSync::sync). La conditionner à
+			 * « quelque chose a été pris cette passe » ratait les commandes déjà
+			 * complètes qui (re)entrent dans le périmètre sans qu'aucune allocation
+			 * n'ait eu lieu cette fois-ci — par exemple après un aller-retour manuel
+			 * de statut.
+			 */
+			$fresh = wc_get_order( $key );
 
-				if ( $fresh instanceof \WC_Order ) {
-					StatusSync::sync( $fresh );
-				}
+			if ( $fresh instanceof \WC_Order ) {
+				StatusSync::sync( $fresh );
 			}
 		} finally {
 			unset( self::$in_progress[ $key ] );
@@ -310,6 +317,19 @@ final class Allocator {
 			}
 
 			if ( $allocated <= 0 ) {
+				/*
+				 * Rien pris cette passe : rattraper malgré tout une commande déjà
+				 * complète qui n'a jamais été synchronisée (aller-retour de statut,
+				 * timeout d'une réaffectation précédente). sync() est idempotente.
+				 */
+				if ( Items::order_is_ready( $order ) ) {
+					$fresh = wc_get_order( $order_id );
+
+					if ( $fresh instanceof \WC_Order && StatusSync::sync( $fresh ) !== $status_before ) {
+						$report['basculees'][] = $fresh->get_order_number();
+					}
+				}
+
 				continue;
 			}
 
@@ -689,7 +709,17 @@ final class Allocator {
 					continue;
 				}
 
-				$prepared = Items::prepared( $item );
+				/*
+				 * Normalisation défensive : Items::prepared() n'est jamais bornée
+				 * par get_quantity(). Si la quantité de la ligne a été réduite après
+				 * pointage (édition manuelle de la commande, sans normalisation de
+				 * _mh_prep_qty à ce jour), la valeur brute peut dépasser la quantité
+				 * réelle. Sans ce plafond, le take ci-dessous porterait sur un
+				 * pointage fantôme et le mécanisme de mise au rebut plus bas
+				 * scraperait le rattrapage de désynchronisation EN PLUS du retrait
+				 * demandé.
+				 */
+				$prepared = min( (int) $item->get_quantity(), Items::prepared( $item ) );
 
 				if ( $prepared <= 0 ) {
 					continue;
@@ -697,14 +727,21 @@ final class Allocator {
 
 				$take = min( $prepared, $remaining );
 
-				// Dépointer restitue au stock libre la part qui en venait. L'article
-				// étant écarté, on la retire aussitôt : le compteur reste net.
+				/*
+				 * Dépointer restitue au stock libre TOUT l'écart entre la valeur
+				 * brute (éventuellement désynchronisée) et la cible visée ici — pas
+				 * seulement $take. Seule la part réellement demandée en retrait doit
+				 * disparaître (mise au rebut) ; l'éventuel surplus de rattrapage doit
+				 * rester légitimement au libre. D'où le plafond à $take sur ce qui
+				 * est repris, distinct de ce que set_quantity() vient de restituer.
+				 */
 				$before = Stock::get( $product_id );
 				Items::set_quantity( $item, $prepared - $take );
 				$returned = Stock::get( $product_id ) - $before;
+				$scrap    = min( $take, max( 0, $returned ) );
 
-				if ( $returned > 0 ) {
-					Stock::adjust( $product_id, -$returned );
+				if ( $scrap > 0 ) {
+					Stock::adjust( $product_id, -$scrap );
 				}
 
 				$remaining        -= $take;
@@ -836,6 +873,19 @@ final class Allocator {
 			}
 
 			if ( $taken_here <= 0 ) {
+				/*
+				 * Rien pris cette passe : rattraper malgré tout une commande déjà
+				 * complète mais jamais synchronisée (timeout d'une réaffectation
+				 * précédente, aller-retour de statut). Sans effet en simulation.
+				 */
+				if ( ! $dry_run && Items::order_is_ready( $order ) ) {
+					$fresh = wc_get_order( $order_id );
+
+					if ( $fresh instanceof \WC_Order && StatusSync::sync( $fresh ) !== $status_before ) {
+						$report['basculees'][] = $fresh->get_order_number();
+					}
+				}
+
 				continue;
 			}
 

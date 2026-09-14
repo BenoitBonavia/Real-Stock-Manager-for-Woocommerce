@@ -11,6 +11,7 @@ defined( 'ABSPATH' ) || exit;
 
 $rsmw_order_id      = (int) $data['order_id'];
 $rsmw_nonce         = (string) $data['nonce'];
+$rsmw_in_scope      = (bool) $data['in_scope'];
 $rsmw_done          = (int) $data['done'];
 $rsmw_ordered       = (int) $data['ordered'];
 $rsmw_total         = (int) $data['total'];
@@ -47,9 +48,17 @@ $rsmw_lines         = (array) $data['lines'];
 			<span id="mh-prep-fill-ordered" class="mh-bar__ordered" style="width:<?php echo esc_attr( (string) $rsmw_ordered_pct ); ?>%"></span>
 		</span>
 
-		<button type="button" class="button" data-mh-all="1"><?php esc_html_e( 'Tout est prêt', 'real-stock-manager-for-woocommerce' ); ?></button>
-		<button type="button" class="button" data-mh-all="0"><?php esc_html_e( 'Tout remettre à zéro', 'real-stock-manager-for-woocommerce' ); ?></button>
+		<?php if ( $rsmw_in_scope ) : ?>
+			<button type="button" class="button" data-mh-all="1"><?php esc_html_e( 'Tout est prêt', 'real-stock-manager-for-woocommerce' ); ?></button>
+			<button type="button" class="button" data-mh-all="0"><?php esc_html_e( 'Tout remettre à zéro', 'real-stock-manager-for-woocommerce' ); ?></button>
+		<?php endif; ?>
 	</div>
+
+	<?php if ( ! $rsmw_in_scope ) : ?>
+		<p class="mh-out-of-scope">
+			<?php esc_html_e( 'Cette commande est hors du périmètre de préparation — lecture seule.', 'real-stock-manager-for-woocommerce' ); ?>
+		</p>
+	<?php endif; ?>
 
 	<table>
 		<thead>
@@ -75,9 +84,9 @@ $rsmw_lines         = (array) $data['lines'];
 				<td class="mh-c"><?php echo esc_html( (string) $rsmw_line['quantity'] ); ?></td>
 				<td class="mh-c">
 					<span class="mh-step">
-						<button type="button" data-mh-delta="-1" <?php disabled( 0, $rsmw_line['prepared'] ); ?>>−</button>
+						<button type="button" data-mh-delta="-1" <?php disabled( ! $rsmw_in_scope || 0 === $rsmw_line['prepared'] ); ?>>−</button>
 						<span class="mh-qty"><?php echo esc_html( $rsmw_line['prepared'] . ' / ' . $rsmw_line['quantity'] ); ?></span>
-						<button type="button" data-mh-delta="1" <?php disabled( $rsmw_line['prepared'] >= $rsmw_line['quantity'] ); ?>>+</button>
+						<button type="button" data-mh-delta="1" <?php disabled( ! $rsmw_in_scope || $rsmw_line['prepared'] >= $rsmw_line['quantity'] ); ?>>+</button>
 					</span>
 				</td>
 				<?php // Modificateur plutôt qu'un span interne : le JS remplace le contenu de la cellule. ?>
