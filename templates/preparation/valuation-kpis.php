@@ -16,7 +16,7 @@ $rsmw_val = (array) $data['valuation'];
 ?>
 <div class="rsmw-kpis">
 	<div class="rsmw-kpi">
-		<div class="rsmw-kpi__label"><?php esc_html_e( 'Valeur d’achat du stock', 'real-stock-manager-for-woocommerce' ); ?></div>
+		<div class="rsmw-kpi__label"><?php esc_html_e( 'Valeur d’achat du stock libre', 'real-stock-manager-for-woocommerce' ); ?></div>
 		<?php if ( Cost::SOURCE_NONE === Cost::source() ) : ?>
 			<div class="rsmw-kpi__value">&mdash;</div>
 			<div class="rsmw-kpi__sub">
@@ -49,7 +49,7 @@ $rsmw_val = (array) $data['valuation'];
 		<?php endif; ?>
 	</div>
 	<div class="rsmw-kpi">
-		<div class="rsmw-kpi__label"><?php esc_html_e( 'Valeur marchande du stock', 'real-stock-manager-for-woocommerce' ); ?></div>
+		<div class="rsmw-kpi__label"><?php esc_html_e( 'Valeur marchande du stock libre', 'real-stock-manager-for-woocommerce' ); ?></div>
 		<div class="rsmw-kpi__value"><?php echo wp_kses_post( wc_price( $rsmw_val['market_free'] ) ); ?></div>
 		<div class="rsmw-kpi__sub">
 			<?php

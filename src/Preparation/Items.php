@@ -102,12 +102,16 @@ final class Items {
 	 * en stock implicite et le compteur reste à zéro. Dépointer ne restitue que
 	 * ce qui avait réellement été prélevé.
 	 *
-	 * @param \WC_Order_Item_Product $item    Ligne de commande.
-	 * @param int                    $new_qty Quantité visée.
+	 * @param \WC_Order_Item_Product $item           Ligne de commande.
+	 * @param int                    $new_qty        Quantité visée.
+	 * @param bool                   $supply_arrived La hausse vient d'une réception fournisseur
+	 *                                                (Allocator::receive()) : la part convertie ne
+	 *                                                doit pas être recréditée à Supply, receive()
+	 *                                                solde lui-même ce compteur via son résidu.
 	 *
 	 * @return array{delta:int, qty:int, converted:int}
 	 */
-	public static function set_quantity( $item, $new_qty ): array {
+	public static function set_quantity( $item, $new_qty, bool $supply_arrived = false ): array {
 		$max     = (int) $item->get_quantity();
 		$new_qty = max( 0, min( $max, (int) $new_qty ) );
 		$old_qty = self::prepared( $item );
@@ -160,6 +164,20 @@ final class Items {
 		if ( $ordered > $max_ordered ) {
 			$converted = $ordered - $max_ordered;
 			$item->update_meta_data( Supply::ITEM_META, $max_ordered );
+
+			/*
+			 * La marchandise n'est pas forcément arrivée : quand le préparé
+			 * monte pour une autre raison qu'une réception fournisseur (stock
+			 * libre disponible, pointage manuel, réaffectation), la part de
+			 * commande fournisseur ainsi libérée doit redevenir du réassort
+			 * non attribué — sinon elle disparaît purement et simplement des
+			 * deux compteurs. Seul Allocator::receive() passe supply_arrived à
+			 * true : il gère lui-même le solde du compteur fournisseur via son
+			 * propre résidu, ce crédit serait alors un double comptage.
+			 */
+			if ( ! $supply_arrived ) {
+				Supply::adjust( $product_id, $converted );
+			}
 		}
 
 		$item->update_meta_data( Legacy::ITEM_QTY_META, $new_qty );

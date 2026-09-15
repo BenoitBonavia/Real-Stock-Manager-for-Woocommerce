@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.4.0
+Stable tag: 3.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,14 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.5.0 =
+* Correctif : le stock physique et la réserve fournisseur détenus par une commande restaient gelés dès qu'elle sortait du périmètre de préparation (annulation, remboursement, mise à la corbeille, suppression, retrait de son statut du réglage « Statuts à préparer »…) — ils ne redevenaient jamais disponibles pour les autres commandes.
+* Correctif : une commande fournisseur déjà satisfaite autrement qu'à la réception (stock retrouvé en réserve, réaffectation, pointage manuel) faisait disparaître la quantité pourtant toujours attendue du fournisseur, au lieu de la remettre en circulation.
+* Correctif : sur l'onglet « Inventaire », la colonne « Déjà attribué » ignorait les commandes « À empaqueter », pourtant celles qui détiennent le plus de stock.
+* Correctif : sur l'onglet « Inventaire », une référence au stock hérité négatif pouvait bloquer silencieusement l'enregistrement de tout le formulaire, ou voir son signe inversé au lieu d'être laissée intacte.
+* Correctif : sur l'onglet « Inventaire », le stock WooCommerce mutualisé entre les variations d'un même produit s'écrasait lui-même selon l'ordre d'édition des lignes ; seule la ligne qui le gère réellement peut désormais le modifier.
+* Plusieurs libellés de l'onglet « Inventaire » et des indicateurs de valorisation sont renommés pour décrire exactement ce qu'ils affichent (« Stock libre » plutôt que « Stock réel », « Commandé (non affecté) », « … du stock libre »).
 
 = 3.4.0 =
 * Correctif : dépointer une ligne depuis la fiche commande d'une commande « À empaqueter » n'avait aucun effet visible — le stock repris était aussitôt réattribué automatiquement, avec un message annonçant à tort un retour à un statut antérieur.

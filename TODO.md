@@ -66,192 +66,91 @@ de ce qui a été livré pour référence future :
    rebut (`Stock::adjust` négatif) qu'à hauteur de `$take` réellement demandé,
    laissant le surplus de rattrapage légitimement au libre.
 
+## FAIT — Chantier 6, libération des compteurs à la sortie du périmètre
+
+Implémenté le 14.09.2026 (`src/Preparation/Allocator.php`,
+`src/Modules/OrderPreparation.php`). Deux méthodes privées partagées
+(`release_item()`, `release_order()`), idempotentes, réutilisées par tous les
+points d'entrée :
+
+- **A1** — `release_if_out_of_scope()` sur `woocommerce_order_status_changed` :
+  restitue le stock détenu dès qu'une commande sort du périmètre suivi
+  (annulation, remboursement total, échec, statut retiré du réglage...).
+- **A2** — `release_on_trash()` sur `woocommerce_trash_order` (hook
+  indispensable et non redondant : vérifié dans le cœur WooCommerce, la mise
+  à la corbeille NE déclenche PAS `woocommerce_order_status_changed`),
+  `release_on_delete()` sur `woocommerce_before_delete_order` (suppression
+  directe, sans passage par la corbeille), `release_on_delete_item()` sur
+  `woocommerce_before_delete_order_item` (suppression d'une seule ligne).
+- **A3** — `on_order_refunded()` sur `woocommerce_order_refunded` : réduit le
+  pointage à hauteur du remboursement, traité en mise au rebut (pas de
+  restitution automatique au libre — le hook ne dit pas si l'article a été
+  physiquement repris). **Limite assumée, non résolue** : `get_quantity()`
+  sur la ligne d'origine n'est jamais abaissée par WooCommerce après un
+  remboursement, donc un repointage manuel ultérieur (bouton « + » de la
+  métabox) peut remonter au-delà de ce qui est réellement encore dû. Corriger
+  ce résidu demanderait de faire descendre une notion de « quantité
+  effective » dans `Items::prepared()`, `order_is_ready()`, le clamp de
+  `set_quantity()` et la requête SQL brute de `Demand::map()` — chantier à
+  part entière, non traité ici.
+- **A4** — `release_removed_statuses()` sur `update_option_rsmw_prep_statuses` :
+  libère automatiquement les commandes des statuts retirés du réglage,
+  bornée à 2000 commandes par sécurité (`Log::error` si le plafond est
+  atteint).
+- **A5** — `normalize_saved_items()` sur `woocommerce_saved_order_items` :
+  reborne `_mh_prep_qty`/`_rsmw_prep_ordered` sur la nouvelle quantité d'une
+  ligne éditée, et rappelle `StatusSync::sync()` (une ligne neuve incomplète
+  ajoutée à une commande « À empaqueter » la redescend enfin).
+- **A6** — `flag_completed_without_prep()` sur `woocommerce_order_status_changed` :
+  signale seulement (note de commande + `Log::error`), **aucune écriture sur
+  `Stock`** — décision produit actée avec l'utilisateur : le plugin ne
+  suppose jamais qu'une commande a été expédiée en dehors de son propre
+  système de pointage.
+
+---
+
+## FAIT — Lot 1 : chantiers 7 + 8 + 9
+
+Implémenté le 14.09.2026 (`src/Preparation/Items.php`, `Allocator.php`,
+`Demand.php`, `Inventory.php`, `src/Preparation/Admin/StockPage.php`,
+`templates/preparation/inventory-page.php`, `valuation-kpis.php`). Deux
+points retracés à la main s'écartent de la formulation littérale de
+l'audit — détail conservé dans le plan `lucky-snacking-honey.md` :
+
+- **Chantier 7 (B5, B6, B7)** — `Items::set_quantity()` gagne un paramètre
+  `$supply_arrived` : la conversion commandé→préparé recrédite désormais
+  `Supply` partout sauf dans `Allocator::receive()` (seul appelant où la
+  marchandise est réellement arrivée). Le résidu de `receive()` puise
+  d'abord dans le pool libre fournisseur PUIS, si besoin, directement dans
+  les lignes détentrices via une nouvelle méthode partagée
+  `reclaim_ordered_from_holders()` (réutilisée aussi par
+  `cancel_supplier_order()`). Les 4 sites qui augmentent `ordered` exploitent
+  désormais la valeur réellement écrite par `Items::set_ordered()`, avec
+  `Log::error` si le bornage mord.
+- **Chantier 8 (E1, C3, E4)** — `Demand::map()` calcule une nouvelle clé
+  `detenu` (Σ `_mh_prep_from_stock`, scopée à `holder_order_ids()` donc
+  « À empaqueter » comprises), utilisée par la colonne « Déjà attribué » de
+  l'Inventaire. `read_inventory_input()`/`Inventory::apply()` préservent le
+  signe de bout en bout au lieu de clamper à zéro en lecture (qui aurait
+  silencieusement remis à 0 toute référence négative héritée non éditée à
+  chaque enregistrement) ; `min="0"` retiré du gabarit, seul le plancher
+  d'écriture de `Stock::set()`/`Supply::set()` fait foi. Le stock WooCommerce
+  mutualisé entre variations n'est plus éditable que depuis la ligne qui le
+  gère réellement (`get_stock_managed_by_id() === $id`), les autres l'affichent
+  en lecture seule — supprime mécaniquement le bug d'écrasement mutuel.
+- **Chantier 9 (E2, E3, unification)** — colonne Inventaire « Commandé »
+  renommée « Commandé (non affecté) » avec infobulle ; KPI de valorisation
+  renommés « … du stock libre » (option légère retenue plutôt que d'ajouter
+  un troisième périmètre `Σ from_stock` à `Valuation::compute()`, pour ne pas
+  charger l'onglet Réception d'une requête `Demand::map()` supplémentaire) ;
+  colonne Inventaire « Stock réel » → « Stock libre », seule appellation
+  activement trompeuse des trois relevées par l'audit.
+
 ---
 
 ## À PLANIFIER — Chantiers restants, par impact/effort
 
-### 6. [fort/fort] Libération des compteurs à la sortie du périmètre — LE CHANTIER STRUCTUREL
-
-- **Fichiers** : `src/Preparation/Allocator.php`, `src/Modules/OrderPreparation.php`
-
-Huit événements de cycle de vie (`trash`, `untrash`, `delete_order`,
-`saved_order_items`, etc.) ne sont câblés que sur `Demand::flush` —
-invalidation de cache, aucune restitution de stock. `before_delete_order`,
-`before_delete_order_item`, `order_refunded`, `refund_created` ne sont câblés
-nulle part.
-
-- **A1 — Sortie du périmètre (annulé/remboursé/échec/on-hold retiré/corbeille)**
-  (`Demand.php:90`) : le `from_stock` détenu n'est jamais restitué au libre.
-  La commande quitte `active_order_ids()` ET `holder_order_ids()` → `withdraw()`
-  et `cancel_supplier_order()` (qui bouclent sur `holder_order_ids()`) ne
-  peuvent plus jamais le reprendre. `reallocate_all()` ne fait que descendre du
-  libre vers les commandes, jamais remonter. Aggravation : si le marchand
-  corrige l'Inventaire à la main pour compenser, écriture absolue sans reprise
-  → double comptage au retour de la commande dans le périmètre.
-- **A2 — Suppression définitive** (`OrderPreparation.php:109`) : WooCommerce
-  détruit les order_itemmeta AVANT d'émettre `woocommerce_delete_order` — à ce
-  moment `_mh_prep_from_stock` n'existe déjà plus. Perte sèche, aucune donnée
-  en base ne permet un rattrapage automatique. Seules fenêtres où les metas
-  sont encore lisibles : `woocommerce_before_delete_order` et
-  `woocommerce_before_delete_order_item` (non câblés).
-- **A3 — Remboursement partiel** (`OrderPreparation.php:101`) : aucun hook
-  `woocommerce_order_refunded`/`woocommerce_refund_created`. La commande RESTE
-  dans le périmètre (seul cas de toute la liste) et continue d'afficher 100%
-  préparé pendant que le stock dérive en permanence, sans qu'aucun mécanisme
-  de sortie ne puisse la rattraper.
-- **A4 — Changement du réglage "Statuts à préparer"** (`Demand.php:60`) :
-  aucun `update_option_*` observé. Retirer un statut gèle instantanément tout
-  le stock détenu par le parc de commandes concerné (40 commandes × plusieurs
-  unités chacune), sans la moindre transition, sans log, sans notice. Ajouter
-  un statut fait entrer des commandes sans qu'aucun `maybe_auto_allocate` ne
-  tourne pour elles (I6 rompu jusqu'au clic "Réaffecter").
-- **A5 — Baisse de quantité / suppression de ligne** (`OrderPreparation.php:106`) :
-  `woocommerce_saved_order_items` ne fait que `Demand::flush`. `_mh_prep_qty`
-  n'est jamais reborné à la nouvelle quantité — c'est le prérequis exact du
-  bug #5 ci-dessus (run_withdraw).
-- **A6 — `completed` sans pointage préalable** (`Allocator.php:189`) : chemin
-  dégradé mais fréquent (auto_allocate décoché, création API REST, emballage
-  manuel puis clic direct "Terminée"). `_mh_stock_reel` reste inchangé alors
-  que la marchandise est physiquement partie → sur-estimation permanente,
-  redistribuée ensuite à d'autres commandes qui basculent "À empaqueter" sans
-  marchandise réelle.
-
-**Correctif proposé** : ajouter dans `Allocator::register()` une méthode
-`release_order($order)` accrochée à `woocommerce_order_status_changed` prio 20 :
-si `$from ∈ Config::statuses()+STATUS_SLUG` et `$to ∉` cet ensemble, parcourir
-les lignes et restituer `Items::set_quantity($item, 0)` (restitue `from_stock`
-au libre) + `Items::set_ordered($item, 0)` avec `Supply::adjust(+ordered)` —
-sous `without_auto_allocation()`. Câbler la même routine sur
-`woocommerce_trash_order`, `woocommerce_before_delete_order`,
-`woocommerce_before_delete_order_item` (seules fenêtres où les metas sont
-lisibles). Ajouter un handler `woocommerce_order_refunded` qui abaisse le
-pointé de la quantité remboursée via `_refunded_item_id`. Ajouter une
-normalisation sur `woocommerce_saved_order_items` qui reborne
-`_mh_prep_qty`/`_mh_prep_from_stock` sur la nouvelle quantité et rappelle
-`StatusSync::sync()`. Accrocher `update_option_{prefixe}prep_statuses` sur une
-routine de libération pour les statuts retirés et sur une notice de
-réaffectation pour les statuts ajoutés.
-
-### 7. [fort/moyen] Rendre la conversion commandé→préparé symétrique
-
-- **Fichiers** : `src/Preparation/Items.php`, `src/Preparation/Allocator.php`
-
-- **B5** (`Items.php:162`) : `Items::set_quantity()` rabaisse
-  `_rsmw_prep_ordered` quand le préparé monte (règle anti double-comptage) et
-  retourne `$converted`, mais ne recrédite JAMAIS `Supply` du montant
-  converti. Un seul appelant sur quatre exploite cette valeur de retour
-  (`Allocator::receive()` ligne 305). Les trois autres — `allocate_order`
-  (`:86`, déclenché automatiquement), `reallocate_all` passe 1 (`:822`),
-  `Ajax::handle` (`:53`/`:65`) — la jettent. Rejoué : marchand commande 4 au
-  fournisseur → FIFO sert la commande client (`Supply`=0, `ordered`=4,
-  correct) → marchand retrouve 4 unités en réserve et les saisit dans
-  l'Inventaire (`Stock::set`) → il clique "Tout est prêt" dans la métabox →
-  `Ajax::handle` → `set_quantity` prend le stock, convertit `ordered` à 0,
-  **jette `$converted`**. Résultat : `Supply`=0 ET Σ`ordered`=0 alors que 4
-  unités sont TOUJOURS chez le fournisseur. Conséquences en cascade : la
-  référence disparaît du tableau "Réception d'un colis" (`expected` calculé à
-  0 → `continue`), et une nouvelle commande client de 4 déclenche une
-  sur-commande fournisseur de 4 unités déjà payées et en transit.
-- **B6** (`Allocator.php:346`) : dans `receive()`, `$residual = max(0, $qty -
-  $converted)` puis `Supply::adjust(-$residual)` — le plancher à 0 écrête en
-  silence quand une ligne couverte par du fournisseur n'a pas pu être servie
-  faute de stock suffisant pour tout le monde (FIFO ASC sert d'abord une autre
-  commande). Résultat rejoué à la main : `Supply`=0 après réception complète
-  d'un colis, mais une ligne reste avec `ordered`=2 — la page Besoins calcule
-  "manque=0" pour une commande réellement découverte de 2 unités, sans que le
-  fournisseur n'ait plus rien en route.
-- **B7** (`Items.php:88`) : `Items::set_ordered()` borne sur
-  `room = quantity - prepared` sans jamais rendre l'écart à `Supply`, et sa
-  valeur de retour (la quantité RÉELLEMENT écrite) n'est exploitée par AUCUN
-  des 4 appelants. Rejoué : ligne à `ordered`=6 dont la quantité client a été
-  réduite à 2 après coup (I3 déjà rompu silencieusement) ; annulation
-  fournisseur de 1 unité → `set_ordered` rabote la ligne de 6 à 2 (perte de 4,
-  pas 1) ; le compte rendu annonce "1 unité annulée".
-
-**Correctif proposé** : ajouter un paramètre
-`Items::set_quantity($item, $new_qty, bool $supply_arrived = false)`. Quand
-`$supply_arrived` est faux et `$converted > 0`, appeler
-`Supply::adjust($product_id, +$converted)` juste après la conversion — la
-marchandise n'est pas arrivée, elle redevient du réassort libre. Seul
-`Allocator::receive()` passe `true`. Remplacer
-`Supply::adjust($product_id, -$residual)` (`receive()` ligne 346) par une
-reprise qui puise d'abord dans le pool libre PUIS dans les
-`_rsmw_prep_ordered` des lignes (sémantique de `cancel_supplier_order`, à
-extraire en méthode privée partagée sans note ni log). Exploiter la valeur de
-retour de `Items::set_ordered()` aux 4 sites d'appel
-(`allocate_ordered_to_order:145-146`, `order_from_supplier:438-439`,
-`cancel_supplier_order:551`, `reallocate_all:918-919`) : n'ajuster `Supply`
-que de l'écart réellement écrit, journaliser en `Log::error` quand le
-bornage mord.
-
-### 8. [fort/moyen] Onglet Inventaire : mesurer le physique, borner les saisies, dédoublonner le stock WooCommerce
-
-- **Fichiers** : `src/Preparation/Inventory.php`, `src/Preparation/Admin/StockPage.php`, `templates/preparation/inventory-page.php`
-
-- **E1** (`Inventory.php:119`) : "Déjà attribué" lit `Demand::map(false)['pointe']`,
-  qui n'agrège que `active_order_ids()` — donc PAS les commandes
-  `mh-empaqueter`, celles qui détiennent le plus de stock. La colonne affiche
-  "·" précisément à l'instant où une commande vient de se compléter. Le
-  marchand qui compte physiquement son rayon (ex : 10 unités = 6 libres + 4
-  dans un carton "À empaqueter") lit "Stock réel 0" (sic, colonne mal nommée,
-  voir aussi ticket 9) + "Déjà attribué ·" = 6 au lieu de 10, et "corrige" à
-  10 → double comptage immédiat, redistribué à une autre commande.
-- **C3** (`StockPage.php:497`) : `read_inventory_input()` applique `absint()`
-  aux deux champs — `absint()` retourne la VALEUR ABSOLUE, pas un écrêtage à
-  zéro. Une valeur négative héritée postée devient positive. Et côté rendu,
-  la valeur affichée n'est pas bornée (`value="-3"` avec `min="0"` sur
-  l'input) : si la ligne est masquée par le filtre de recherche JS
-  (`display:none` sans retrait du DOM), le navigateur ne peut rien focaliser
-  et échoue en silence — toute la soumission (potentiellement 40 corrections)
-  est perdue sans le moindre message.
-- **E4** (`Inventory.php:155`) : pour une variation à stock mutualisé au
-  niveau du parent, les N variations affichent/éditent le même compteur
-  "Stock WooCommerce". `Inventory::apply()` boucle dans l'ordre du POST et
-  écrit à chaque ligne : la correction ne "prend" que si le marchand édite la
-  DERNIÈRE variation du produit dans l'ordre du tableau ; sinon les lignes
-  suivantes écrasent la correction avec l'ancienne valeur affichée. Compte
-  rendu "2 références mises à jour", valeur finale inchangée.
-
-**Correctif proposé** : alimenter "Déjà attribué" depuis
-`Demand::holder_order_ids()` (inclut `mh-empaqueter`) via une requête agrégée
-dédiée `SUM(_mh_prep_from_stock)`, par ex. `Items::held_map()`. Remplacer
-`absint()` par `max(0, (int) $values['libre'])` en lecture, et borner la
-valeur rendue par `max(0, Stock::get($id))` (ou retirer `min="0"` de l'input).
-Dans `Inventory::all_rows()`, ne marquer `woo_managed = true` que si
-`get_stock_managed_by_id() === $id` ; pour les variations héritant du parent,
-rendre en lecture seule. Dans `Inventory::apply()`, dédoublonner par
-identifiant gérant le stock avant d'appeler `apply_woo_stock()`.
-
-### 9. [moyen/faible] Aligner les définitions et libellés entre écrans
-
-- **Fichiers** : `src/Preparation/Inventory.php`, `templates/preparation/inventory-page.php`, `src/Preparation/Valuation.php`, `templates/preparation/valuation-kpis.php`, `src/Preparation/Admin/NeedsPage.php`
-
-- **E2** (`Inventory.php:114` vs `NeedsPage.php:232-233`) : "Commandé" =
-  `Supply::get` SEUL sur Inventaire et fiche produit, mais
-  `map['commande'] + Supply::get` (réservé + libre) sur Besoins, Réception et
-  panneau Sélection. Quatre écrans disent 8, deux disent 4, sous des libellés
-  interchangeables. Le champ de l'Inventaire est ÉDITABLE et écrit en
-  ABSOLU : recopier le chiffre lu sur Besoins (8) dans l'Inventaire
-  (`Supply::set(id, 8)`) laisse les 4 déjà réservées gravées sur leur ligne —
-  "En commande" affiche ensuite 12 pour 8 unités réellement en route. Seule
-  la fiche produit verbalise la distinction (`supply_hint`).
-- **E3** (`Valuation.php:28`) : `Valuation::compute()` ne part que de
-  `Stock::free_map()` + `Supply::free_map()` — le stock LIBRE seul. Une
-  boutique qui a tout pointé (toutes commandes en "À empaqueter") affiche
-  0,00 € sous "Valeur d'achat du stock", entrepôt plein. Aucune mention à
-  l'écran ne le signale (contrairement à l'avertissement "Coût manquant sur N
-  référence(s)" qui, lui, existe).
-
-**Correctif proposé** : renommer la colonne Inventaire en "Commandé non
-affecté" + reprendre la phrase d'aide de `ProductFields::supply_hint()`, ou
-ajouter une colonne lecture seule "dont réservé". Ajouter à
-`Valuation::compute()` un troisième périmètre alimenté par Σ
-`_mh_prep_from_stock` sur `holder_order_ids()`, et afficher "dont affecté à
-des commandes : X €" — ou a minima renommer le KPI en "Valeur du stock
-libre". Unifier "Stock réel" / "Stock libre" / "Stock physique libre", qui
-désignent tous `_mh_stock_reel`.
-
-### 10. [moyen/moyen] Réparation des négatifs hérités : la rendre conservative
+### 7. [moyen/moyen] Réparation des négatifs hérités : la rendre conservative
 
 - **Fichiers** : `src/Preparation/Admin/NeedsPage.php`, `templates/preparation/needs-page.php`
 
@@ -273,7 +172,7 @@ le négatif au fur et à mesure — de sorte que `Stock::get + Σ from_stock` so
 identique avant/après le clic. À défaut, afficher sur la carte le nombre
 d'unités qui vont apparaître et exiger une confirmation explicite.
 
-### 11. [moyen/moyen] Références supprimées : purge à la suppression et filtrage des orphelins
+### 8. [moyen/moyen] Références supprimées : purge à la suppression et filtrage des orphelins
 
 - **Fichiers** : `src/Modules/OrderPreparation.php`, `src/Preparation/Stock.php`, `src/Preparation/Supply.php`, `src/Preparation/Reception.php`, `src/Preparation/Purchase.php`, `src/Preparation/Inventory.php`, `src/Preparation/Admin/StockPage.php`
 
@@ -313,7 +212,7 @@ ou avertir tant qu'une variation porte un compteur non nul. Ajouter
 jointure `INNER JOIN wp_posts ... post_type IN ('product','product_variation')`
 dans `Stock::free_map()`, `Supply::free_map()`, `Stock::negative_ids()`.
 
-### 12. [moyen/fort] Atomicité des compteurs et idempotence des formulaires
+### 9. [moyen/fort] Atomicité des compteurs et idempotence des formulaires
 
 - **Fichiers** : `src/Preparation/Stock.php`, `src/Preparation/Supply.php`, `src/Preparation/Allocator.php`, `src/Preparation/Admin/StockPage.php`, `src/Preparation/Journal.php`, `assets/js/reception.js`
 
@@ -360,7 +259,7 @@ porter le `$batch` de réception par le formulaire plutôt que généré côté
 serveur pour permettre une reprise. Verrouiller ou rendre append-only
 `Journal::add()`.
 
-### 13. [moyen/moyen] Rendre l'écart mesurable : diagnostic et réglages
+### 10. [moyen/moyen] Rendre l'écart mesurable : diagnostic et réglages
 
 - **Fichiers** : `src/Preparation/Demand.php`, `src/Modules/OrderPreparation.php`, `src/Admin/SettingsTab.php`, `src/Preparation/OrderStatus.php`
 
@@ -474,8 +373,8 @@ incomplet.
   l'invariant revendiqué par AUCUNE partie du code (Stock.php documente
   explicitement le compteur comme "LIBRE", jamais "physique total"). Reste
   une nuance de formulation dans un attribut `title` et un souhait
-  d'observabilité, traité par le chantier 8 (E1) qui porte sur autre chose de
-  plus concret (le périmètre `holder_order_ids`).
+  d'observabilité — E1 (le vrai défaut : le périmètre `holder_order_ids`) a
+  depuis été corrigé au lot « chantiers 7+8+9 ».
 - **"L'action groupée 'Marquer À empaqueter' gèle définitivement une commande
   non pointée"** (`OrderStatus.php:152`) : réfuté — la métabox reste active
   sans condition de statut, un clic sur "+"/"Tout remettre à zéro" appelle
@@ -483,26 +382,28 @@ incomplet.
   repli `$actives[0]` puis la reprise automatique via
   `maybe_auto_allocate`. La commande n'est PAS invisible : `OrdersColumn`
   inclut explicitement `mh-empaqueter` dans les statuts suivis. Reste une
-  suggestion d'ergonomie mineure, absorbée par le chantier 2 (repli de
-  statut) et le chantier 1 (sync inconditionnel).
+  suggestion d'ergonomie mineure, absorbée par les chantiers 1 et 2 [FAIT]
+  (sync inconditionnel, repli de statut).
 - **"`receive()` relit la commande sans vérifier l'instance"**
   (`Allocator.php:316`) : confirmé comme défaut mais traité dans le
-  chantier 12 (F5) plutôt qu'en item séparé — fenêtre étroite, correctif
-  trivial (aligner sur les 10 autres sites du fichier).
+  chantier 9 (atomicité et idempotence, F5) plutôt qu'en item séparé —
+  fenêtre étroite, correctif trivial (aligner sur les 10 autres sites du
+  fichier).
 - **"'Déjà attribué' compte le pointé et non le prélevé, contredisant son
   infobulle"** (`inventory-page.php:103`) : réfuté — le mot "prélevé" est
   exact dans le modèle du plugin (pointer sans stock déclaré = entrée en
   stock implicite documentée comme "règle structurante"), et aucun écran ni
-  doc ne promet l'arithmétique d'I1 sur cette colonne. Absorbé par le
-  chantier 8 (E1) qui porte sur le vrai défaut : le périmètre
-  `active_order_ids()` au lieu de `holder_order_ids()`.
+  doc ne promet l'arithmétique d'I1 sur cette colonne. E1 (le vrai défaut :
+  le périmètre `active_order_ids()` au lieu de `holder_order_ids()`) a
+  depuis été corrigé au lot « chantiers 7+8+9 ».
 - **"Le stock d'un produit passé en 'à variations' devient invisible et non
   corrigeable"** (`Inventory.php:52`) : réfuté sur ses deux jambes — corrigeable
   via "Mouvement à l'unité" (`resolve_product` accepte le SKU/ID du parent),
   et la contradiction "affectable mais inattribuable" ne tient pas
   (`allocatable_count` ne compte que s'il existe une ligne qui réclame
   vraiment la référence, auquel cas `reallocate_all` la sert effectivement).
-  Résidu mineur (gêne ergonomique) absorbé par le chantier 11 (G1).
+  Résidu mineur (gêne ergonomique) absorbé par le chantier 8 (références
+  supprimées, G1).
 - **"Aucune borne haute sur les quantités de mouvement"** (`StockPage.php:536`) :
   réfuté — aucune rupture d'invariant (le système enregistre fidèlement une
   saisie fausse, il ne dérive pas), aucune borne haute n'est définissable sans

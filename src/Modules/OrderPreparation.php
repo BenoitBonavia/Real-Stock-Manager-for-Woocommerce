@@ -14,10 +14,12 @@ use RSMW\Preparation\Admin\Pages;
 use RSMW\Preparation\Admin\ProductFields;
 use RSMW\Preparation\Admin\ReferenceContext;
 use RSMW\Preparation\Allocator;
+use RSMW\Preparation\Config;
 use RSMW\Preparation\Demand;
 use RSMW\Preparation\SnippetGuard;
 use RSMW\Preparation\StatusSync;
 use RSMW\Suppliers\Admin\ProductField as SupplierProductField;
+use RSMW\Support\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -112,5 +114,18 @@ final class OrderPreparation extends AbstractModule {
 		foreach ( $events as $event ) {
 			add_action( $event, array( Demand::class, 'flush' ) );
 		}
+
+		/*
+		 * Retrait d'un statut du périmètre suivi : les commandes qui en
+		 * détenaient du stock doivent le restituer, pas seulement voir le
+		 * cache invalidé. Câblé ici et non dans Allocator, qui n'a aujourd'hui
+		 * aucune dépendance sur les réglages en écriture.
+		 */
+		add_action(
+			'update_option_' . Settings::option_name( Config::KEY_STATUSES ),
+			array( Allocator::class, 'release_removed_statuses' ),
+			10,
+			2
+		);
 	}
 }

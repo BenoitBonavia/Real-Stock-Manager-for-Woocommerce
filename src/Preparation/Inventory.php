@@ -93,9 +93,10 @@ final class Inventory {
 				continue;
 			}
 
-			$info      = Labels::get( $id );
-			$terms     = isset( $categories[ $parents[ $id ] ] ) ? $categories[ $parents[ $id ] ] : array();
-			$woo_stock = self::woo_stock_for( $product );
+			$info         = Labels::get( $id );
+			$terms        = isset( $categories[ $parents[ $id ] ] ) ? $categories[ $parents[ $id ] ] : array();
+			$woo_stock    = self::woo_stock_for( $product );
+			$woo_editable = $product->get_stock_managed_by_id() === $id;
 
 			$rows[] = array(
 				'id'             => $id,
@@ -112,12 +113,18 @@ final class Inventory {
 				'thumbnail'      => $product->get_image( 'woocommerce_thumbnail', array( 'class' => 'rsmw-thumb' ) ),
 				'libre'          => Stock::get( $id ),
 				'commande'       => Supply::get( $id ),
-				// Lecture seule : déjà pointé (prélevé) sur des commandes
-				// clients en attente — voir la colonne « Pointé » de « Besoins
-				// pour commande ». Ni « Stock réel » ni « Commandé » ci-dessus
-				// ne l'incluent, les deux ne comptant que le libre.
-				'attribue'       => isset( $demand[ $id ]['pointe'] ) ? (int) $demand[ $id ]['pointe'] : 0,
+				// Lecture seule : réellement prélevé sur le stock physique pour
+				// des commandes clients, « À empaqueter » comprises — ce sont
+				// justement celles qui en détiennent le plus. Ni « Stock
+				// libre » ni « Commandé » ci-dessus ne l'incluent, les deux ne
+				// comptant que le libre.
+				'attribue'       => isset( $demand[ $id ]['detenu'] ) ? (int) $demand[ $id ]['detenu'] : 0,
 				'woo_managed'    => null !== $woo_stock,
+				// Distinct de woo_managed : une variation à stock mutualisé au
+				// niveau du parent AFFICHE la valeur héritée mais ne doit pas
+				// pouvoir l'ÉDITER depuis cette ligne — sinon plusieurs lignes
+				// du même formulaire s'écrasent silencieusement l'une l'autre.
+				'woo_editable'   => $woo_editable && null !== $woo_stock,
 				'woo_stock'      => $woo_stock,
 				'categories'     => wp_list_pluck( $terms, 'name' ),
 				'category_slugs' => wp_list_pluck( $terms, 'slug' ),
@@ -153,6 +160,15 @@ final class Inventory {
 		$current = $product ? self::woo_stock_for( $product ) : null;
 
 		if ( null === $current || $quantity === $current ) {
+			return false;
+		}
+
+		// Défense contre un POST forgé ou une incohérence de cache : le
+		// gabarit ne rend plus de champ éditable pour une référence dont le
+		// stock est mutualisé au niveau du parent (voir woo_editable dans
+		// all_rows()), donc cet identifiant ne devrait jamais arriver ici
+		// sans être son propre gestionnaire.
+		if ( $product->get_stock_managed_by_id() !== $product_id ) {
 			return false;
 		}
 
@@ -236,8 +252,19 @@ final class Inventory {
 
 			$touched = false;
 
+			/*
+			 * Comparaison sur la valeur SIGNÉE, contre un Stock::get()/
+			 * Supply::get() lui-même potentiellement négatif pour une
+			 * référence héritée : une ligne que le marchand n'a pas touchée
+			 * revient donc identique à sa valeur en base, et ne déclenche
+			 * aucune écriture. Écrêter la comparaison à zéro écrirait 0 à la
+			 * place de la dette au moindre enregistrement du formulaire, y
+			 * compris sur des lignes jamais éditées. Stock::set()/
+			 * Supply::set() plafonnent déjà à zéro à l'écriture elle-même —
+			 * rien à faire ici pour une correction réellement voulue.
+			 */
 			if ( isset( $values['libre'] ) ) {
-				$libre = max( 0, (int) $values['libre'] );
+				$libre = (int) $values['libre'];
 
 				if ( $libre !== Stock::get( $product_id ) ) {
 					Stock::set( $product_id, $libre );
@@ -246,7 +273,7 @@ final class Inventory {
 			}
 
 			if ( isset( $values['commande'] ) ) {
-				$commande = max( 0, (int) $values['commande'] );
+				$commande = (int) $values['commande'];
 
 				if ( $commande !== Supply::get( $product_id ) ) {
 					Supply::set( $product_id, $commande );

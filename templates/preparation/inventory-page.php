@@ -50,7 +50,7 @@ $rsmw_report     = $data['report'];
 	<?php endif; ?>
 
 	<p class="description">
-		<?php esc_html_e( 'Le catalogue entier — un produit simple par ligne, une ligne par déclinaison pour un produit à variations. Stock réel, commandé fournisseur et stock WooCommerce (celui affiché au client) sont modifiables directement ; seules les valeurs réellement changées sont enregistrées. « Déjà attribué » est un rappel en lecture seule, déjà pointé sur des commandes clients en attente.', 'real-stock-manager-for-woocommerce' ); ?>
+		<?php esc_html_e( 'Le catalogue entier — un produit simple par ligne, une ligne par déclinaison pour un produit à variations. Stock libre, commandé fournisseur non affecté et stock WooCommerce (celui affiché au client) sont modifiables directement ; seules les valeurs réellement changées sont enregistrées. « Déjà attribué » est un rappel en lecture seule, déjà prélevé sur le stock physique pour des commandes clients.', 'real-stock-manager-for-woocommerce' ); ?>
 	</p>
 
 	<?php if ( empty( $rsmw_rows ) ) : ?>
@@ -97,10 +97,16 @@ $rsmw_report     = $data['report'];
 							<tr>
 								<th class="rsmw-thumb-col"><span class="screen-reader-text"><?php esc_html_e( 'Image', 'real-stock-manager-for-woocommerce' ); ?></span></th>
 								<th data-key="name"><?php esc_html_e( 'Référence', 'real-stock-manager-for-woocommerce' ); ?></th>
-								<th class="rsmw-num" data-key="libre"><?php esc_html_e( 'Stock réel', 'real-stock-manager-for-woocommerce' ); ?></th>
-								<th class="rsmw-num" data-key="commande"><?php esc_html_e( 'Commandé', 'real-stock-manager-for-woocommerce' ); ?></th>
+								<th class="rsmw-num" data-key="libre"
+									title="<?php esc_attr_e( 'Stock physique libre, non affecté à une commande', 'real-stock-manager-for-woocommerce' ); ?>">
+									<?php esc_html_e( 'Stock libre', 'real-stock-manager-for-woocommerce' ); ?>
+								</th>
+								<th class="rsmw-num" data-key="commande"
+									title="<?php esc_attr_e( 'Commandé au fournisseur et pas encore reçu, hors des articles déjà réservés sur des commandes clients', 'real-stock-manager-for-woocommerce' ); ?>">
+									<?php esc_html_e( 'Commandé (non affecté)', 'real-stock-manager-for-woocommerce' ); ?>
+								</th>
 								<th class="rsmw-num rsmw-col-secondary" data-key="attribue"
-									title="<?php esc_attr_e( 'Déjà pointé (prélevé) sur des commandes clients en attente', 'real-stock-manager-for-woocommerce' ); ?>">
+									title="<?php esc_attr_e( 'Déjà prélevé sur le stock physique pour des commandes clients, y compris celles prêtes à empaqueter', 'real-stock-manager-for-woocommerce' ); ?>">
 									<?php esc_html_e( 'Déjà attribué', 'real-stock-manager-for-woocommerce' ); ?>
 								</th>
 								<th class="rsmw-num" data-key="woo"
@@ -144,9 +150,15 @@ $rsmw_report     = $data['report'];
 								</td>
 								<td class="rsmw-num">
 									<label class="screen-reader-text" for="rsmw-libre-<?php echo esc_attr( (string) $rsmw_id ); ?>">
-										<?php esc_html_e( 'Stock réel', 'real-stock-manager-for-woocommerce' ); ?>
+										<?php esc_html_e( 'Stock libre', 'real-stock-manager-for-woocommerce' ); ?>
 									</label>
-									<input type="number" min="0" step="1"
+									<?php // Pas de min="0" : une référence au stock hérité négatif doit
+									// rester soumissible telle quelle, sinon le navigateur bloque
+									// silencieusement toute la sauvegarde dès que la ligne est
+									// masquée par le filtre de recherche (constraint validation
+									// ignorée sur un champ caché). Le plancher réel est appliqué à
+									// l'écriture, par Stock::set(). ?>
+									<input type="number" step="1"
 										class="rsmw-field__input--qty"
 										id="rsmw-libre-<?php echo esc_attr( (string) $rsmw_id ); ?>"
 										name="rsmw_inventory[<?php echo esc_attr( (string) $rsmw_id ); ?>][libre]"
@@ -156,7 +168,7 @@ $rsmw_report     = $data['report'];
 									<label class="screen-reader-text" for="rsmw-commande-<?php echo esc_attr( (string) $rsmw_id ); ?>">
 										<?php esc_html_e( 'Commandé au fournisseur', 'real-stock-manager-for-woocommerce' ); ?>
 									</label>
-									<input type="number" min="0" step="1"
+									<input type="number" step="1"
 										class="rsmw-field__input--qty"
 										id="rsmw-commande-<?php echo esc_attr( (string) $rsmw_id ); ?>"
 										name="rsmw_inventory[<?php echo esc_attr( (string) $rsmw_id ); ?>][commande]"
@@ -166,7 +178,7 @@ $rsmw_report     = $data['report'];
 									<?php echo $rsmw_row['attribue'] ? esc_html( (string) $rsmw_row['attribue'] ) : '<span class="rsmw-zero">·</span>'; ?>
 								</td>
 								<td class="rsmw-num">
-									<?php if ( $rsmw_row['woo_managed'] ) : ?>
+									<?php if ( $rsmw_row['woo_editable'] ) : ?>
 										<label class="screen-reader-text" for="rsmw-woo-<?php echo esc_attr( (string) $rsmw_id ); ?>">
 											<?php esc_html_e( 'Stock WooCommerce', 'real-stock-manager-for-woocommerce' ); ?>
 										</label>
@@ -175,6 +187,11 @@ $rsmw_report     = $data['report'];
 											id="rsmw-woo-<?php echo esc_attr( (string) $rsmw_id ); ?>"
 											name="rsmw_inventory[<?php echo esc_attr( (string) $rsmw_id ); ?>][woo]"
 											value="<?php echo esc_attr( (string) $rsmw_row['woo_stock'] ); ?>">
+									<?php elseif ( $rsmw_row['woo_managed'] ) : ?>
+										<span class="rsmw-inventory__woo <?php echo $rsmw_row['woo_stock'] <= 0 ? 'rsmw-lack' : ''; ?>"
+											title="<?php esc_attr_e( 'Stock mutualisé, géré au niveau du produit parent : à corriger depuis sa fiche ou depuis Mouvement à l’unité.', 'real-stock-manager-for-woocommerce' ); ?>">
+											<?php echo esc_html( (string) $rsmw_row['woo_stock'] ); ?>
+										</span>
 									<?php else : ?>
 										<span class="rsmw-zero" title="<?php esc_attr_e( 'Cette référence ne suit pas de quantité WooCommerce.', 'real-stock-manager-for-woocommerce' ); ?>">·</span>
 									<?php endif; ?>

@@ -493,16 +493,28 @@ final class StockPage {
 
 			$row = array();
 
+			/*
+			 * Signé, volontairement : absint() renvoie une valeur ABSOLUE, pas
+			 * un écrêtage à zéro. Une référence au stock hérité négatif
+			 * soumise sans y toucher doit rester lisible telle quelle pour
+			 * qu'Inventory::apply() puisse la comparer à Stock::get()/
+			 * Supply::get() (eux-mêmes potentiellement négatifs) et ne rien
+			 * écrire quand rien n'a changé — écrêter ici écrirait 0 à sa
+			 * place au moindre enregistrement du formulaire, même si le
+			 * marchand n'a pas touché cette ligne. Le plancher réel est
+			 * appliqué à l'écriture, par Stock::set()/Supply::set().
+			 */
 			if ( isset( $values['libre'] ) ) {
-				$row['libre'] = absint( $values['libre'] );
+				$row['libre'] = (int) $values['libre'];
 			}
 
 			if ( isset( $values['commande'] ) ) {
-				$row['commande'] = absint( $values['commande'] );
+				$row['commande'] = (int) $values['commande'];
 			}
 
-			// Signé, contrairement aux deux autres : WooCommerce autorise un
-			// stock négatif quand le retard de commande (backorder) est permis.
+			// Signé pour la même raison : WooCommerce autorise en plus un
+			// stock négatif à part entière quand le retard de commande
+			// (backorder) est permis.
 			if ( isset( $values['woo'] ) ) {
 				$row['woo'] = (int) $values['woo'];
 			}

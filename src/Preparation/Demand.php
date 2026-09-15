@@ -106,9 +106,17 @@ final class Demand {
 	/**
 	 * Table des besoins : une entrée par référence.
 	 *
+	 * `detenu` est calculé sur un périmètre plus large que le reste de la
+	 * ligne (`holder_order_ids()`, qui inclut les commandes « À empaqueter »)
+	 * : c'est la seule clé qui mesure ce qui est physiquement immobilisé,
+	 * peu importe que la commande ait encore quelque chose à préparer. Les
+	 * autres clés restent scopées à `active_order_ids()` : une commande
+	 * « À empaqueter » n'a plus rien à préparer, l'y inclure fausserait
+	 * `restant`/`commande`/`plus_vieux`.
+	 *
 	 * @param bool $use_cache Lire le cache si disponible.
 	 *
-	 * @return array<int, array{demande:int, pointe:int, restant:int, commande:int, commandes:int, plus_vieux:?int, parent:int}>
+	 * @return array<int, array{demande:int, pointe:int, restant:int, commande:int, commandes:int, plus_vieux:?int, parent:int, detenu:int}>
 	 */
 	public static function map( bool $use_cache = true ): array {
 		if ( $use_cache ) {
@@ -121,28 +129,28 @@ final class Demand {
 
 		global $wpdb;
 
-		$order_ids = self::active_order_ids();
-		$map       = array();
-		$ttl       = Config::cache_ttl();
+		$active_ids    = self::active_order_ids();
+		$holder_ids    = self::holder_order_ids();
+		$active_lookup = array_flip( $active_ids ); // sert aussi de rang chronologique pour plus_vieux.
+		$map           = array();
+		$ttl           = Config::cache_ttl();
 
 		set_transient(
 			Legacy::CACHE_META_KEY,
 			array(
 				'time'   => time(),
-				'orders' => count( $order_ids ),
+				'orders' => count( $active_ids ),
 			),
 			$ttl
 		);
 
-		if ( empty( $order_ids ) ) {
+		if ( empty( $holder_ids ) ) {
 			set_transient( Legacy::CACHE_KEY, $map, $ttl );
 
 			return $map;
 		}
 
-		// Rang chronologique, pour retrouver la commande la plus ancienne par référence.
-		$rank         = array_flip( $order_ids );
-		$placeholders = implode( ',', array_fill( 0, count( $order_ids ), '%d' ) );
+		$placeholders = implode( ',', array_fill( 0, count( $holder_ids ), '%d' ) );
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- placeholders générés, valeurs passées à prepare() ; résultat mis en cache par transient.
 		$sql = $wpdb->prepare(
@@ -152,14 +160,15 @@ final class Demand {
 			        MAX( CASE WHEN m.meta_key = '_variation_id' THEN m.meta_value END ) AS vid,
 			        MAX( CASE WHEN m.meta_key = '_qty'          THEN m.meta_value END ) AS qty,
 			        MAX( CASE WHEN m.meta_key = %s              THEN m.meta_value END ) AS prep,
-			        MAX( CASE WHEN m.meta_key = %s              THEN m.meta_value END ) AS ord
+			        MAX( CASE WHEN m.meta_key = %s              THEN m.meta_value END ) AS ord,
+			        MAX( CASE WHEN m.meta_key = %s              THEN m.meta_value END ) AS src
 			   FROM {$wpdb->prefix}woocommerce_order_items          AS oi
 			   INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta AS m
 			           ON m.order_item_id = oi.order_item_id
 			  WHERE oi.order_item_type = 'line_item'
 			    AND oi.order_id IN ( {$placeholders} )
 			  GROUP BY oi.order_item_id",
-			array_merge( array( Legacy::ITEM_QTY_META, Supply::ITEM_META ), $order_ids )
+			array_merge( array( Legacy::ITEM_QTY_META, Supply::ITEM_META, Legacy::ITEM_SOURCE_META ), $holder_ids )
 		);
 
 		$rows = $wpdb->get_results( $sql );
@@ -173,13 +182,9 @@ final class Demand {
 				continue;
 			}
 
-			$quantity = (int) $row->qty;
-			$prepared = max( 0, min( $quantity, (int) $row->prep ) );
-			$order_id = (int) $row->order_id;
-
-			// Borné par ce qui reste à couvrir : préparé + commandé ne peut
-			// dépasser la quantité voulue par le client.
-			$ordered = max( 0, min( $quantity - $prepared, (int) $row->ord ) );
+			$quantity     = (int) $row->qty;
+			$prepared_raw = max( 0, (int) $row->prep );
+			$order_id     = (int) $row->order_id;
 
 			if ( ! isset( $map[ $key ] ) ) {
 				$map[ $key ] = array(
@@ -189,6 +194,7 @@ final class Demand {
 					'commande'   => 0,
 					'commandes'  => array(),
 					'plus_vieux' => null,
+					'detenu'     => 0,
 
 					/*
 					 * Produit parent d'une variation, égal à la clé pour un produit
@@ -203,6 +209,29 @@ final class Demand {
 				);
 			}
 
+			/*
+			 * Détenu : ce qui est réellement prélevé sur le stock physique
+			 * pour cette ligne, avec le même repli de compatibilité que
+			 * Items::from_stock() (meta absente = héritée d'avant son
+			 * introduction, la quantité pointée en tient lieu), borné à la
+			 * quantité de la ligne pour l'affichage.
+			 */
+			$src_raw = ( '' === $row->src || null === $row->src ) ? $prepared_raw : max( 0, (int) $row->src );
+
+			$map[ $key ]['detenu'] += min( $quantity, $src_raw );
+
+			// Le reste ne concerne que les commandes encore actives : une
+			// commande « À empaqueter » n'a plus rien à préparer.
+			if ( ! isset( $active_lookup[ $order_id ] ) ) {
+				continue;
+			}
+
+			$prepared = min( $quantity, $prepared_raw );
+
+			// Borné par ce qui reste à couvrir : préparé + commandé ne peut
+			// dépasser la quantité voulue par le client.
+			$ordered = max( 0, min( $quantity - $prepared, (int) $row->ord ) );
+
 			$map[ $key ]['demande']  += $quantity;
 			$map[ $key ]['pointe']   += $prepared;
 			$map[ $key ]['restant']  += max( 0, $quantity - $prepared );
@@ -213,7 +242,7 @@ final class Demand {
 
 				$current = $map[ $key ]['plus_vieux'];
 
-				if ( null === $current || $rank[ $order_id ] < $rank[ $current ] ) {
+				if ( null === $current || $active_lookup[ $order_id ] < $active_lookup[ $current ] ) {
 					$map[ $key ]['plus_vieux'] = $order_id;
 				}
 			}
