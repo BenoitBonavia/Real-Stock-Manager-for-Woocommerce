@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.6.0
+Stable tag: 3.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,10 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.6.1 =
+* Correctif urgent : une commande normalement préparée puis marquée « Terminée » (expédiée) recréditait son stock au libre, comme si la marchandise n'était jamais sortie — au lieu de ne restituer le stock qu'aux commandes annulées, remboursées, en échec ou à la corbeille, où la marchandise est réellement restée en rayon. Ce bug, actif depuis la version précédente, fabriquait du stock fantôme en continu à chaque commande expédiée.
+* Correctif : par effet de bord du même bug, une commande entièrement préparée puis terminée pouvait recevoir à tort la note « jamais pointée » alors qu'elle l'avait bien été.
 
 = 3.6.0 =
 * Correctif : le pointage d'une ligne de commande n'était jamais bloqué par le stock physique libre — un article pouvait être marqué « prêt » sans qu'aucune unité ne soit réellement disponible. Le pointage manuel (boutons de la métabox) est désormais limité à ce qui est en stock, avec un message explicite quand ce n'est pas suffisant.

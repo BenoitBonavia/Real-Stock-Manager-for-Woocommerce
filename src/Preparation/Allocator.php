@@ -272,6 +272,11 @@ final class Allocator {
 	 * teste jamais $from : si la commande était déjà hors périmètre, il n'y a
 	 * simplement rien à restituer (no-op silencieux via release_item()).
 	 *
+	 * « Terminée » est un cas à part : la marchandise préparée a été expédiée,
+	 * elle ne doit PAS revenir au stock libre — contrairement à une annulation,
+	 * un remboursement ou un échec, où elle est restée en rayon. Voir
+	 * release_item().
+	 *
 	 * @param int       $order_id Identifiant de commande.
 	 * @param string    $from     Statut précédent, non utilisé.
 	 * @param string    $to       Statut courant.
@@ -292,9 +297,11 @@ final class Allocator {
 			return;
 		}
 
+		$keep_prepared = 'completed' === (string) $to;
+
 		self::without_auto_allocation(
-			static function () use ( $order ) {
-				self::release_order( $order );
+			static function () use ( $order, $keep_prepared ) {
+				self::release_order( $order, $keep_prepared );
 			}
 		);
 	}
@@ -366,9 +373,13 @@ final class Allocator {
 			return;
 		}
 
+		// Mettre une commande Terminée à la corbeille ne rend pas la marchandise
+		// déjà expédiée : voir release_item().
+		$keep_prepared = 'completed' === $order->get_status();
+
 		self::without_auto_allocation(
-			static function () use ( $order ) {
-				self::release_order( $order );
+			static function () use ( $order, $keep_prepared ) {
+				self::release_order( $order, $keep_prepared );
 			}
 		);
 	}
@@ -394,9 +405,13 @@ final class Allocator {
 			return;
 		}
 
+		// Supprimer une commande Terminée ne rend pas la marchandise déjà
+		// expédiée : voir release_item().
+		$keep_prepared = 'completed' === $order->get_status();
+
 		self::without_auto_allocation(
-			static function () use ( $order ) {
-				self::release_order( $order );
+			static function () use ( $order, $keep_prepared ) {
+				self::release_order( $order, $keep_prepared );
 			}
 		);
 	}
@@ -420,26 +435,36 @@ final class Allocator {
 			return;
 		}
 
+		$order = wc_get_order( $item->get_order_id() );
+
+		// Supprimer une ligne d'une commande Terminée ne rend pas la
+		// marchandise déjà expédiée : voir release_item().
+		$keep_prepared = $order instanceof \WC_Order && 'completed' === $order->get_status();
+
 		self::without_auto_allocation(
-			static function () use ( $item ) {
-				$released = self::release_item( $item );
+			static function () use ( $item, $order, $keep_prepared ) {
+				$released = self::release_item( $item, $keep_prepared );
 
 				if ( $released <= 0 ) {
 					return;
 				}
 
 				Demand::flush();
-				Log::info( sprintf( 'Ligne %d supprimée : %d article(s) restitué(s) au stock libre.', $item->get_id(), $released ) );
-
-				$order = wc_get_order( $item->get_order_id() );
+				Log::info( sprintf( 'Ligne %d supprimée : %d article(s) restitué(s)%s.', $item->get_id(), $released, $keep_prepared ? ' (réserve fournisseur uniquement, commande terminée)' : ' au stock libre' ) );
 
 				if ( $order instanceof \WC_Order ) {
 					$order->add_order_note(
-						sprintf(
-							/* translators: %d: nombre d'articles restitués. */
-							__( 'Ligne supprimée : %d article(s) restitué(s) au stock libre.', 'real-stock-manager-for-woocommerce' ),
-							$released
-						)
+						$keep_prepared
+							? sprintf(
+								/* translators: %d: nombre d'articles. */
+								__( 'Ligne supprimée : %d article(s) encore réservé(s) chez le fournisseur ont été relâchés. Le stock déjà prélevé pour cette ligne reste décompté, la marchandise a été expédiée.', 'real-stock-manager-for-woocommerce' ),
+								$released
+							)
+							: sprintf(
+								/* translators: %d: nombre d'articles restitués. */
+								__( 'Ligne supprimée : %d article(s) restitué(s) au stock libre.', 'real-stock-manager-for-woocommerce' ),
+								$released
+							)
 					);
 				}
 			}
@@ -628,7 +653,10 @@ final class Allocator {
 					$order = wc_get_order( $order_id );
 
 					if ( $order instanceof \WC_Order ) {
-						self::release_order( $order );
+						// Rare, mais « Terminée » a pu faire partie des statuts
+						// retirés : la marchandise déjà expédiée ne doit pas
+						// revenir au stock libre. Voir release_item().
+						self::release_order( $order, 'completed' === $order->get_status() );
 						++$processed;
 					}
 				}
@@ -1470,18 +1498,28 @@ final class Allocator {
 
 	/**
 	 * Restitue au libre ce qu'une ligne détient : stock physique prélevé et
-	 * réserve fournisseur. Cible 0 dans les deux cas — contrairement au
-	 * retrait (run_withdraw), aucune part n'est mise au rebut ici : la
-	 * commande quitte le système suivi, ce qu'elle détenait doit intégralement
-	 * redevenir disponible pour les autres.
+	 * réserve fournisseur. Contrairement au retrait (run_withdraw), aucune part
+	 * n'est mise au rebut ici : la commande quitte le système suivi, ce qu'elle
+	 * détenait doit intégralement redevenir disponible pour les autres —
+	 * SAUF si la marchandise a été expédiée (voir $keep_prepared).
 	 *
 	 * Idempotente : une ligne déjà à 0/0 ne produit aucune écriture.
 	 *
-	 * @param \WC_Order_Item_Product $item Ligne de commande.
+	 * @param \WC_Order_Item_Product $item          Ligne de commande.
+	 * @param bool                   $keep_prepared La commande a été marquée
+	 *                                               « Terminée » : le stock
+	 *                                               préparé a été expédié, il
+	 *                                               ne redevient pas libre. Seule
+	 *                                               une réserve fournisseur
+	 *                                               encore en attente (anomalie :
+	 *                                               commande terminée sans être
+	 *                                               passée par la préparation
+	 *                                               complète) redevient du
+	 *                                               réassort non attribué.
 	 *
 	 * @return int Quantité totale restituée (préparé + commandé fournisseur).
 	 */
-	private static function release_item( $item ): int {
+	private static function release_item( $item, bool $keep_prepared = false ): int {
 		if ( ! $item instanceof \WC_Order_Item_Product ) {
 			return 0;
 		}
@@ -1495,6 +1533,10 @@ final class Allocator {
 			Items::set_ordered( $item, 0 );
 			Supply::adjust( $product_id, $ordered );
 			$released += $ordered;
+		}
+
+		if ( $keep_prepared ) {
+			return $released;
 		}
 
 		$prepared = Items::prepared( $item );
@@ -1511,27 +1553,36 @@ final class Allocator {
 	 * Applique release_item() à toutes les lignes d'une commande, journalise
 	 * et pose une note si quelque chose a effectivement été restitué.
 	 *
-	 * @param \WC_Order $order Commande.
+	 * @param \WC_Order $order         Commande.
+	 * @param bool      $keep_prepared Voir release_item().
 	 */
-	private static function release_order( \WC_Order $order ): void {
+	private static function release_order( \WC_Order $order, bool $keep_prepared = false ): void {
 		$released = 0;
 
 		foreach ( $order->get_items() as $item ) {
-			$released += self::release_item( $item );
+			$released += self::release_item( $item, $keep_prepared );
 		}
 
-		if ( $released > 0 ) {
-			$order->add_order_note(
-				sprintf(
+		if ( $released <= 0 ) {
+			return;
+		}
+
+		$order->add_order_note(
+			$keep_prepared
+				? sprintf(
+					/* translators: %d: nombre d'articles. */
+					__( 'Commande terminée : %d article(s) encore réservé(s) chez le fournisseur ont été relâchés. Le stock déjà prélevé pour cette commande reste décompté, la marchandise a été expédiée.', 'real-stock-manager-for-woocommerce' ),
+					$released
+				)
+				: sprintf(
 					/* translators: %d: nombre d'articles restitués. */
 					__( 'Sortie du périmètre de préparation : %d article(s) restitué(s) au stock libre.', 'real-stock-manager-for-woocommerce' ),
 					$released
 				)
-			);
+		);
 
-			Demand::flush();
-			Log::info( sprintf( 'Commande %d sortie du périmètre : %d article(s) restitué(s).', $order->get_id(), $released ) );
-		}
+		Demand::flush();
+		Log::info( sprintf( 'Commande %d sortie du périmètre : %d article(s) restitué(s)%s.', $order->get_id(), $released, $keep_prepared ? ' (réserve fournisseur uniquement, commande terminée)' : '' ) );
 	}
 
 	/**

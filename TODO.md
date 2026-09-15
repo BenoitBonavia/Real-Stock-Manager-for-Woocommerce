@@ -192,6 +192,30 @@ l'utilisateur, planifiés dans `lucky-snacking-honey.md` :
   dont l'écart avec `detenu` mesure directement, en lecture seule, le volume
   encore pointé sans prélèvement correspondant sur les commandes actives.
 
+**Correctif d'urgence le même jour (v3.6.1)** : en relisant le code pour
+répondre à une question de l'utilisateur sur la purge ci-dessus, découvert que
+`release_if_out_of_scope()` (chantier 6, v3.5.0, plus tôt le même jour)
+restituait au stock libre la part préparée d'une commande **quel que soit le
+statut de sortie** — y compris « Terminée », c'est-à-dire une commande
+normalement expédiée. Chaque commande correctement préparée puis marquée
+Terminée recréditait donc son stock comme si la marchandise n'était jamais
+sortie : un bug actif, en production depuis le déploiement du matin, qui
+fabrique du stock fantôme en continu (pas seulement sur l'historique). `Items`
+préparé/prélevé n'est plus jamais restitué quand `$to === 'completed'` — seule
+une éventuelle réserve fournisseur encore en attente l'est, cas résiduel
+distinct. Corrigé sur les 5 points d'entrée de `release_order()`
+(`release_if_out_of_scope`, `release_on_trash`, `release_on_delete`,
+`release_on_delete_item`, `release_removed_statuses`) via un nouveau paramètre
+`$keep_prepared` sur `release_item()`/`release_order()`. Effet de bord
+corrigé au passage : `flag_completed_without_prep()` lisait `Items::prepared()`
+*après* que `release_if_out_of_scope()` l'ait déjà remis à zéro sur le même
+hook — il signalait donc à tort « jamais pointé » sur des commandes en réalité
+entièrement préparées. **`FrozenHolds` n'est pas concerné** (aucun crédit de
+stock, quel que soit le statut) mais reste, par la même logique, imprécis sur
+une commande Terminée : il remet `_mh_prep_qty` à zéro au lieu de préserver la
+trace historique de ce qui a été expédié — résidu mineur, non traité ici, sans
+incidence sur l'exactitude du stock.
+
 ---
 
 ## À PLANIFIER — Chantiers restants, par impact/effort
