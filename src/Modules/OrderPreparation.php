@@ -16,6 +16,7 @@ use RSMW\Preparation\Admin\ReferenceContext;
 use RSMW\Preparation\Allocator;
 use RSMW\Preparation\Config;
 use RSMW\Preparation\Demand;
+use RSMW\Preparation\FrozenHolds;
 use RSMW\Preparation\SnippetGuard;
 use RSMW\Preparation\StatusSync;
 use RSMW\Suppliers\Admin\ProductField as SupplierProductField;
@@ -80,6 +81,10 @@ final class OrderPreparation extends AbstractModule {
 			OrdersColumn::register();
 			Pages::register();
 			ProductFields::register();
+
+			// Purge, une fois, des pointages gelés hérités d'avant la libération
+			// automatique du chantier 6 (v3.5.0) — voir FrozenHolds.
+			FrozenHolds::register();
 
 			/*
 			 * Le champ « Fournisseur » est câblé ici, et non depuis un module à

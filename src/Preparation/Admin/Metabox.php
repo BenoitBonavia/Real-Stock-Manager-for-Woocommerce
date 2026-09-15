@@ -158,6 +158,9 @@ final class Metabox {
 					? min( max( 0, 100 - $percent ), (int) round( $ordered_total / $total * 100 ) )
 					: 0,
 				'lines'           => $lines,
+				// Le pointage ne pouvant plus dépasser le stock libre, la métabox a
+				// besoin d'un chemin vers l'écran qui le corrige.
+				'movement_url'    => admin_url( 'admin.php?page=' . Legacy::PAGE_STOCK . '&tab=' . StockPage::TAB_MOVEMENT ),
 			)
 		);
 	}

@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.5.0
+Stable tag: 3.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,10 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.6.0 =
+* Correctif : le pointage d'une ligne de commande n'était jamais bloqué par le stock physique libre — un article pouvait être marqué « prêt » sans qu'aucune unité ne soit réellement disponible. Le pointage manuel (boutons de la métabox) est désormais limité à ce qui est en stock, avec un message explicite quand ce n'est pas suffisant.
+* Correctif : le stock et la réserve fournisseur détenus par une commande sortie du périmètre de préparation AVANT la version 3.5.0 étaient restés gelés, invisibles mais toujours prêts à se recréditer d'eux-mêmes (y compris via le vidage automatique de la corbeille WordPress), au risque d'un double comptage avec une correction de stock déjà effectuée manuellement entre-temps. Une purge automatique, unique, neutralise ces pointages hérités sans toucher au stock libre, et un rapport détaillé s'affiche sur « Besoins pour commande ».
 
 = 3.5.0 =
 * Correctif : le stock physique et la réserve fournisseur détenus par une commande restaient gelés dès qu'elle sortait du périmètre de préparation (annulation, remboursement, mise à la corbeille, suppression, retrait de son statut du réglage « Statuts à préparer »…) — ils ne redevenaient jamais disponibles pour les autres commandes.

@@ -34,7 +34,7 @@
 
 			row.querySelector( '.mh-qty' ).textContent = line.qty + ' / ' + max;
 			row.querySelector( '[data-mh-delta="-1"]' ).disabled = ( line.qty <= 0 );
-			row.querySelector( '[data-mh-delta="1"]' ).disabled = ( line.qty >= max );
+			row.querySelector( '[data-mh-delta="1"]' ).disabled = ( line.qty >= max ) || ( line.free <= 0 );
 			row.classList.toggle( 'is-done', line.qty >= max );
 
 			var free = row.querySelector( '.mh-free' );

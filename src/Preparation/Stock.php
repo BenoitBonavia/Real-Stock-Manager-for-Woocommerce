@@ -35,8 +35,9 @@ final class Stock {
 	/**
 	 * Fixe le stock libre d'une référence.
 	 *
-	 * Plancher à zéro : pointer une ligne sans stock déclaré vaut entrée en stock
-	 * implicite, jamais une dette. Cette règle est structurante, la page « Besoins »
+	 * Plancher à zéro : depuis la v3.6.0 le pointage lui-même est borné par ce
+	 * compteur (`Items::set_quantity()`), ce plancher ne protège donc plus qu'une
+	 * écriture directe (Inventaire, fiche produit, réception). La page « Besoins »
 	 * propose d'ailleurs de remettre à zéro les références héritées d'une version
 	 * antérieure qui autorisait le négatif.
 	 *

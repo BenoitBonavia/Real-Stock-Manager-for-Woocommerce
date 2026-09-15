@@ -18,6 +18,7 @@ $rsmw_total         = (int) $data['total'];
 $rsmw_percent       = (int) $data['percent'];
 $rsmw_ordered_pct   = (int) $data['ordered_percent'];
 $rsmw_lines         = (array) $data['lines'];
+$rsmw_movement_url  = (string) $data['movement_url'];
 ?>
 <div id="mh-prep-box-inner"
 	data-order="<?php echo esc_attr( (string) $rsmw_order_id ); ?>"
@@ -54,6 +55,12 @@ $rsmw_lines         = (array) $data['lines'];
 		<?php endif; ?>
 	</div>
 
+	<?php if ( $rsmw_in_scope ) : ?>
+		<p class="mh-movement-link">
+			<a href="<?php echo esc_url( $rsmw_movement_url ); ?>"><?php esc_html_e( 'Corriger le stock physique →', 'real-stock-manager-for-woocommerce' ); ?></a>
+		</p>
+	<?php endif; ?>
+
 	<?php if ( ! $rsmw_in_scope ) : ?>
 		<p class="mh-out-of-scope">
 			<?php esc_html_e( 'Cette commande est hors du périmètre de préparation — lecture seule.', 'real-stock-manager-for-woocommerce' ); ?>
@@ -86,7 +93,7 @@ $rsmw_lines         = (array) $data['lines'];
 					<span class="mh-step">
 						<button type="button" data-mh-delta="-1" <?php disabled( ! $rsmw_in_scope || 0 === $rsmw_line['prepared'] ); ?>>−</button>
 						<span class="mh-qty"><?php echo esc_html( $rsmw_line['prepared'] . ' / ' . $rsmw_line['quantity'] ); ?></span>
-						<button type="button" data-mh-delta="1" <?php disabled( ! $rsmw_in_scope || $rsmw_line['prepared'] >= $rsmw_line['quantity'] ); ?>>+</button>
+						<button type="button" data-mh-delta="1" <?php disabled( ! $rsmw_in_scope || $rsmw_line['prepared'] >= $rsmw_line['quantity'] || $rsmw_line['free'] <= 0 ); ?>>+</button>
 					</span>
 				</td>
 				<?php // Modificateur plutôt qu'un span interne : le JS remplace le contenu de la cellule. ?>

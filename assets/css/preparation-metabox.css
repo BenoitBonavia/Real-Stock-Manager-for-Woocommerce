@@ -36,6 +36,11 @@
 	background: #d98500;
 }
 
+#mh-prep-box-inner .mh-movement-link {
+	margin: -6px 0 12px;
+	font-size: 12px;
+}
+
 #mh-prep-box-inner .mh-ordered-badge {
 	color: #d98500;
 	font-weight: 600;

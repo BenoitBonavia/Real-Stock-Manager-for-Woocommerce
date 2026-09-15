@@ -58,21 +58,50 @@ final class Ajax {
 
 		$status_before = $order->get_status();
 
+		// Écart entre ce qui a été demandé et ce que le stock libre a permis
+		// d'appliquer — alimente le message renvoyé plus bas, sans jamais
+		// prendre le pas sur un message de bascule de statut.
+		$requested = 0;
+		$applied   = 0;
+
 		if ( isset( $_POST['all'] ) ) {
 
 			$full = (bool) absint( wp_unslash( $_POST['all'] ) );
 
-			Allocator::without_auto_allocation(
+			$stats = Allocator::without_auto_allocation(
 				static function () use ( $order, $full ) {
+					$requested = 0;
+					$applied   = 0;
+
 					foreach ( $order->get_items() as $item ) {
-						Items::set_quantity( $item, $full ? (int) $item->get_quantity() : 0 );
+						$before = Items::prepared( $item );
+						$target = $full ? (int) $item->get_quantity() : 0;
+						$result = Items::set_quantity( $item, $target );
+
+						if ( $full ) {
+							$requested += max( 0, $target - $before );
+							$applied   += max( 0, (int) $result['delta'] );
+						}
 					}
+
+					return array(
+						'requested' => $requested,
+						'applied'   => $applied,
+					);
 				}
 			);
+
+			$requested = $stats['requested'];
+			$applied   = $stats['applied'];
 		} else {
 
 			$item_id = isset( $_POST['item'] ) ? absint( wp_unslash( $_POST['item'] ) ) : 0;
 			$delta   = isset( $_POST['delta'] ) ? (int) wp_unslash( $_POST['delta'] ) : 0;
+
+			// Seul contrat émis par l'interface : un pas d'une unité. Sans cette
+			// borne, un $_POST forgé (delta=999) atteindrait le même état qu'« all=1 »
+			// sans jamais passer par son garde-fou de compte rendu.
+			$delta = max( -1, min( 1, $delta ) );
 
 			// $load_from_db = false : la résolution passe par le data store de LA
 			// commande, dont la requête est scopée par order_id (vérifié y compris
@@ -88,11 +117,16 @@ final class Ajax {
 				wp_send_json_error( __( 'Ligne introuvable.', 'real-stock-manager-for-woocommerce' ) );
 			}
 
-			Allocator::without_auto_allocation(
+			$result = Allocator::without_auto_allocation(
 				static function () use ( $item, $delta ) {
-					Items::set_quantity( $item, Items::prepared( $item ) + $delta );
+					return Items::set_quantity( $item, Items::prepared( $item ) + $delta );
 				}
 			);
+
+			if ( $delta > 0 ) {
+				$requested = $delta;
+				$applied   = max( 0, (int) $result['delta'] );
+			}
 		}
 
 		// Relecture depuis la base : les objets en mémoire sont périmés.
@@ -129,6 +163,18 @@ final class Ajax {
 					__( 'Commande incomplète : retour en « %s ».', 'real-stock-manager-for-woocommerce' ),
 					wc_get_order_status_name( $status_after )
 				);
+		} elseif ( $applied < $requested ) {
+			// Le pointage ne peut plus dépasser le stock libre : dit ici ce que le
+			// clic n'a pas pu faire, plutôt que de laisser croire à un enregistrement
+			// silencieusement partiel.
+			$message = isset( $_POST['all'] )
+				? sprintf(
+					/* translators: 1: articles effectivement pointés, 2: articles demandés. */
+					__( 'Stock libre insuffisant : %1$d article(s) pointé(s) sur %2$d demandé(s).', 'real-stock-manager-for-woocommerce' ),
+					$applied,
+					$requested
+				)
+				: __( 'Stock libre épuisé pour cette référence : rien n’a été pointé. Corrigez d’abord le stock depuis Gestion stock → Mouvement à l’unité.', 'real-stock-manager-for-woocommerce' );
 		}
 
 		$percent = $total > 0 ? (int) round( $done / $total * 100 ) : 0;

@@ -136,6 +136,11 @@ pages *Besoins pour commande* et *Gestion stock*, attribution FIFO, champs de st
 fond d'autant, ce qui évite de compter deux fois une unité qui vient d'arriver ; à la baisse elle
 reste intacte, un dépointage ne ressuscitant pas une commande fournisseur.
 
+**Depuis la v3.6.0, une hausse ne peut jamais dépasser le stock physique libre.** Le même point
+unique l'écrête : au-delà, le retour (`delta`/`qty`) porte ce qui a réellement été appliqué, pas ce
+qui a été demandé, et la métabox comme l'AJAX en rendent compte au lieu d'enregistrer une valeur
+qui n'a pas de contrepartie physique.
+
 Corollaire dans `Allocator::receive()` : seul le **résidu** (`reçu − converti`) est retiré du
 compteur libre, ce que les lignes ont déjà absorbé ne devant pas l'être une seconde fois.
 

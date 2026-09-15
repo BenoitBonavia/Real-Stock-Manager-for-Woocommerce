@@ -116,7 +116,7 @@ final class Demand {
 	 *
 	 * @param bool $use_cache Lire le cache si disponible.
 	 *
-	 * @return array<int, array{demande:int, pointe:int, restant:int, commande:int, commandes:int, plus_vieux:?int, parent:int, detenu:int}>
+	 * @return array<int, array{demande:int, pointe:int, restant:int, commande:int, commandes:int, plus_vieux:?int, parent:int, detenu:int, pointe_detenu:int}>
 	 */
 	public static function map( bool $use_cache = true ): array {
 		if ( $use_cache ) {
@@ -188,13 +188,14 @@ final class Demand {
 
 			if ( ! isset( $map[ $key ] ) ) {
 				$map[ $key ] = array(
-					'demande'    => 0,
-					'pointe'     => 0,
-					'restant'    => 0,
-					'commande'   => 0,
-					'commandes'  => array(),
-					'plus_vieux' => null,
-					'detenu'     => 0,
+					'demande'       => 0,
+					'pointe'        => 0,
+					'restant'       => 0,
+					'commande'      => 0,
+					'commandes'     => array(),
+					'plus_vieux'    => null,
+					'detenu'        => 0,
+					'pointe_detenu' => 0,
 
 					/*
 					 * Produit parent d'une variation, égal à la clé pour un produit
@@ -215,10 +216,15 @@ final class Demand {
 			 * Items::from_stock() (meta absente = héritée d'avant son
 			 * introduction, la quantité pointée en tient lieu), borné à la
 			 * quantité de la ligne pour l'affichage.
+			 *
+			 * Pointe_detenu, à côté : ce qui est pointé sur cette même ligne, sans
+			 * le repli de compatibilité — l'écart pointe_detenu - detenu mesure
+			 * directement un pointage sans prélèvement de stock correspondant.
 			 */
 			$src_raw = ( '' === $row->src || null === $row->src ) ? $prepared_raw : max( 0, (int) $row->src );
 
-			$map[ $key ]['detenu'] += min( $quantity, $src_raw );
+			$map[ $key ]['detenu']        += min( $quantity, $src_raw );
+			$map[ $key ]['pointe_detenu'] += min( $quantity, $prepared_raw );
 
 			// Le reste ne concerne que les commandes encore actives : une
 			// commande « À empaqueter » n'a plus rien à préparer.
@@ -319,6 +325,34 @@ final class Demand {
 		}
 
 		set_transient( self::ALLOCATABLE_TRANSIENT, $total, self::ALLOCATABLE_TTL );
+
+		return $total;
+	}
+
+	/**
+	 * Volume actuellement pointé sans prélèvement de stock physique correspondant.
+	 *
+	 * Mesure directe du symptôme « commande pointée sans stock disponible » : la
+	 * somme, sur toutes les commandes détentrices, de l'écart entre ce qui est
+	 * pointé et ce qui a réellement été prélevé sur le stock physique. Lecture
+	 * seule — dépointer automatiquement effacerait du travail de préparation réel.
+	 *
+	 * @param bool $use_cache Lire le cache si disponible.
+	 *
+	 * @return int
+	 */
+	public static function unbacked_pointed_total( bool $use_cache = true ): int {
+		$total = 0;
+
+		foreach ( self::map( $use_cache ) as $data ) {
+			// Lecture défensive : un transient écrit par une version antérieure du
+			// plugin ne porte pas encore cette clé.
+			if ( ! isset( $data['pointe_detenu'], $data['detenu'] ) ) {
+				continue;
+			}
+
+			$total += max( 0, (int) $data['pointe_detenu'] - (int) $data['detenu'] );
+		}
 
 		return $total;
 	}

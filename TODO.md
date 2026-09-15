@@ -148,6 +148,52 @@ l'audit — détail conservé dans le plan `lucky-snacking-honey.md` :
 
 ---
 
+## FAIT — Pointage borné au stock réel + purge des pointages gelés
+
+Implémenté le 15.09.2026 (`src/Preparation/Items.php`, `Allocator.php`,
+`Demand.php`, nouveau `src/Preparation/FrozenHolds.php`,
+`src/Preparation/Admin/{Ajax,Metabox,NeedsPage}.php`,
+`src/Modules/OrderPreparation.php`,
+`templates/preparation/{metabox,needs-page}.php`,
+`assets/js/preparation-metabox.js`). Suite directe du symptôme production
+« commandes pointées sans stock disponible » (voir diagnostic du 15.09.2026,
+16 agents). Deux correctifs distincts, demandés explicitement par
+l'utilisateur, planifiés dans `lucky-snacking-honey.md` :
+
+- **Bornage du pointage au stock physique libre** — `Items::set_quantity()`
+  n'écrit plus la hausse demandée en entier : elle est désormais plafonnée par
+  `Stock::get()` avant écriture, le retour (`delta`/`qty`) portant ce qui a
+  réellement été appliqué. Inverse délibérément la règle documentée « pointer
+  vaut entrée en stock implicite, jamais une dette » (toujours vraie pour une
+  baisse). Seuls les deux appelants non bornés en amont (`Ajax::handle()`,
+  boutons « Tout est prêt » et +/-) sont concrètement affectés ; les 7 autres
+  appelants (`allocate_order()`, `receive()`, `reallocate_all()`...) étaient
+  déjà bornés par `Stock::get()`/`Stock::free_map()` avant appel — trois d'entre
+  eux exploitent désormais la valeur réellement écrite (`$applied`) avec
+  `Log::error` si le bornage mord, même patron que le chantier 7 sur
+  `set_ordered()`. `receive()` solde d'abord une dette héritée négative avant de
+  créditer le colis reçu, sans quoi le bornage aurait fait disparaître les
+  unités du colis. `Ajax::handle()` borne `$delta` à ±1 (seul contrat émis par
+  l'interface) et renvoie un message explicite quand le stock manque ; la
+  métabox désactive le bouton « + » à stock nul et pointe vers Mouvement à
+  l'unité. Effet dérivé : `_mh_prep_from_stock` suit désormais exactement
+  `_mh_prep_qty` pour toute donnée neuve, rendant I1 vrai par construction.
+- **Purge des pointages gelés hérités d'avant le chantier 6** — nouvelle classe
+  `FrozenHolds`, balayage par lots sur le patron de `PreOrder\Migration`
+  (état + curseur, `admin_init`, une fois). Détecte par une requête directe sur
+  l'itemmeta (identique sous HPOS et en stockage historique, visible jusque
+  dans la corbeille) toute ligne encore pointée ou réservée fournisseur dont la
+  commande n'est plus détentrice (`Demand::holder_order_ids()`), et la remet à
+  zéro **sans rien recréditer** — décision utilisateur : restituer aurait pu
+  doubler un stock déjà recompté à la main entre-temps. Rapport cumulé
+  (références, commandes, unités), plafonné pour rester petit, affiché en carte
+  sur « Besoins pour commande » avec bouton d'acquittement ; `Demand::map()`
+  gagne une clé `pointe_detenu` (symétrique de `detenu`, sans repli d'absence)
+  dont l'écart avec `detenu` mesure directement, en lecture seule, le volume
+  encore pointé sans prélèvement correspondant sur les commandes actives.
+
+---
+
 ## À PLANIFIER — Chantiers restants, par impact/effort
 
 ### 7. [moyen/moyen] Réparation des négatifs hérités : la rendre conservative
@@ -374,7 +420,10 @@ incomplet.
   explicitement le compteur comme "LIBRE", jamais "physique total"). Reste
   une nuance de formulation dans un attribut `title` et un souhait
   d'observabilité — E1 (le vrai défaut : le périmètre `holder_order_ids`) a
-  depuis été corrigé au lot « chantiers 7+8+9 ».
+  depuis été corrigé au lot « chantiers 7+8+9 ». **Caduc depuis la v3.6.0** :
+  le pointage étant désormais borné au stock libre, `from_stock` suit
+  exactement `prepared` pour toute donnée neuve — I1 devient vrai par
+  construction, pas seulement par convention documentaire.
 - **"L'action groupée 'Marquer À empaqueter' gèle définitivement une commande
   non pointée"** (`OrderStatus.php:152`) : réfuté — la métabox reste active
   sans condition de statut, un clic sur "+"/"Tout remettre à zéro" appelle
@@ -395,7 +444,9 @@ incomplet.
   stock implicite documentée comme "règle structurante"), et aucun écran ni
   doc ne promet l'arithmétique d'I1 sur cette colonne. E1 (le vrai défaut :
   le périmètre `active_order_ids()` au lieu de `holder_order_ids()`) a
-  depuis été corrigé au lot « chantiers 7+8+9 ».
+  depuis été corrigé au lot « chantiers 7+8+9 ». **Prémisse disparue en
+  v3.6.0** : l'entrée en stock implicite qui justifiait la nuance n'existe
+  plus, le pointage étant désormais borné au stock libre.
 - **"Le stock d'un produit passé en 'à variations' devient invisible et non
   corrigeable"** (`Inventory.php:52`) : réfuté sur ses deux jambes — corrigeable
   via "Mouvement à l'unité" (`resolve_product` accepte le SKU/ID du parent),

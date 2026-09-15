@@ -15,6 +15,8 @@ $rsmw_statuses    = (array) $data['statuses'];
 $rsmw_unknown     = (array) $data['unknown_statuses'];
 $rsmw_negatives   = (array) $data['negatives'];
 $rsmw_repaired    = $data['repaired'];
+$rsmw_frozen      = (array) $data['frozen'];
+$rsmw_unbacked    = (int) $data['unbacked_pointed'];
 $rsmw_realloc     = $data['reallocation'];
 $rsmw_allocatable = (int) $data['allocatable'];
 $rsmw_cache_meta  = (array) $data['cache_meta'];
@@ -125,6 +127,83 @@ $rsmw_orphan = \RSMW\Preparation\Admin\NeedsPage::TAB_NONE === $rsmw_tab;
 					</button>
 				</form>
 			</div>
+		</div>
+	<?php endif; ?>
+
+	<?php if ( ! empty( $rsmw_frozen['refs'] ) || $rsmw_unbacked > 0 ) : ?>
+		<div class="rsmw-card rsmw-card--report">
+			<div class="rsmw-card__header">
+				<h2 class="rsmw-card__title">
+					<?php
+					echo ! empty( $rsmw_frozen['refs'] )
+						? esc_html__( 'Nettoyage des pointages gelés hérités', 'real-stock-manager-for-woocommerce' )
+						: esc_html__( 'Pointage au-delà du stock physique', 'real-stock-manager-for-woocommerce' );
+					?>
+				</h2>
+			</div>
+			<div class="rsmw-card__body">
+				<?php if ( ! empty( $rsmw_frozen['refs'] ) ) : ?>
+					<p>
+						<?php
+						printf(
+							esc_html(
+								/* translators: 1: nombre d'unités, 2: nombre de commandes. */
+								__( 'Avant la mise à jour du 15/09/2026, %1$d unité(s) sont restées pointées sur %2$d commande(s) sorties du périmètre (annulées, remboursées ou à la corbeille) sans jamais être restituées. Elles viennent d’être neutralisées — le stock libre n’a PAS été modifié : recomptez ces références en rayon et corrigez-les si besoin depuis l’onglet Inventaire.', 'real-stock-manager-for-woocommerce' )
+							),
+							(int) $rsmw_frozen['units'],
+							count( $rsmw_frozen['order_ids'] )
+						);
+						?>
+					</p>
+					<?php if ( ! empty( $rsmw_frozen['truncated'] ) ) : ?>
+						<p><em><?php esc_html_e( 'Liste partielle : le volume dépasse ce que ce rapport peut détailler.', 'real-stock-manager-for-woocommerce' ); ?></em></p>
+					<?php endif; ?>
+					<ul>
+						<?php foreach ( $rsmw_frozen['refs'] as $rsmw_ref ) : ?>
+							<li>
+								<strong><?php echo esc_html( $rsmw_ref['name'] ); ?></strong>
+								— <?php echo esc_html( (string) (int) $rsmw_ref['units'] ); ?> <?php esc_html_e( 'article(s)', 'real-stock-manager-for-woocommerce' ); ?>
+								<?php if ( ! empty( $rsmw_ref['orders'] ) ) : ?>
+									<span class="rsmw-variant">
+										(
+										<?php
+										echo wp_kses_post(
+											implode(
+												', ',
+												array_map(
+													static function ( $rsmw_order ) {
+														return '<a href="' . esc_url( $rsmw_order['url'] ) . '">#' . esc_html( $rsmw_order['num'] ) . '</a>';
+													},
+													$rsmw_ref['orders']
+												)
+											)
+										);
+										?>
+										)
+									</span>
+								<?php endif; ?>
+							</li>
+						<?php endforeach; ?>
+					</ul>
+				<?php endif; ?>
+
+				<?php if ( $rsmw_unbacked > 0 ) : ?>
+					<p>
+						<span class="rsmw-report__figure"><?php echo esc_html( (string) $rsmw_unbacked ); ?></span>
+						<?php esc_html_e( 'article(s) sont actuellement pointés sur des commandes actives sans prélèvement de stock physique correspondant — signe d’un pointage au-delà du stock disponible avant la mise à jour du 15/09/2026. Non corrigé automatiquement : dépointer effacerait du travail de préparation réel.', 'real-stock-manager-for-woocommerce' ); ?>
+					</p>
+				<?php endif; ?>
+			</div>
+			<?php if ( ! empty( $rsmw_frozen['refs'] ) ) : ?>
+				<div class="rsmw-card__footer">
+					<form method="post">
+						<?php wp_nonce_field( 'rsmw_frozen_ack' ); ?>
+						<button type="submit" name="rsmw_frozen_ack" value="1" class="button">
+							<?php esc_html_e( 'J’ai recompté, masquer ce rapport', 'real-stock-manager-for-woocommerce' ); ?>
+						</button>
+					</form>
+				</div>
+			<?php endif; ?>
 		</div>
 	<?php endif; ?>
 

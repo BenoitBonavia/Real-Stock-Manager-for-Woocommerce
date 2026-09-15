@@ -95,11 +95,14 @@ final class Allocator {
 				continue;
 			}
 
-			$take = min( $needed, $free );
+			$take    = min( $needed, $free );
+			$applied = Items::set_quantity( $item, $prepared + $take )['delta'];
 
-			Items::set_quantity( $item, $prepared + $take );
+			if ( $applied !== $take ) {
+				Log::error( sprintf( 'Commande %d, référence #%d : bornage sur set_quantity(), %d appliqué au lieu de %d.', $order->get_id(), Items::key( $item ), $applied, $take ) );
+			}
 
-			$taken += $take;
+			$taken += $applied;
 		}
 
 		if ( $taken > 0 ) {
@@ -671,6 +674,17 @@ final class Allocator {
 			return $report;
 		}
 
+		/*
+		 * Une dette héritée négative absorberait la réception dans le plancher de
+		 * Stock::adjust() : elle est soldée d'abord, la marchandise entre ensuite
+		 * en entier. Sans cela, le bornage de Items::set_quantity() ferait
+		 * purement et simplement disparaître les unités de ce colis.
+		 */
+		if ( Stock::get( $product_id ) < 0 ) {
+			Log::error( sprintf( 'Référence #%d : stock hérité négatif (%d) soldé avant réception.', $product_id, Stock::get( $product_id ) ) );
+			Stock::set( $product_id, 0 );
+		}
+
 		// Le stock entre d'abord en entier, l'affectation le consomme ensuite.
 		Stock::adjust( $product_id, $qty );
 
@@ -708,17 +722,22 @@ final class Allocator {
 					continue;
 				}
 
-				$take = min( $needed, $remaining );
-
+				$take   = min( $needed, $remaining );
 				$result = Items::set_quantity( $item, Items::prepared( $item ) + $take, true );
+
+				$applied = (int) $result['delta'];
+
+				if ( $applied !== $take ) {
+					Log::error( sprintf( 'Commande %d, référence #%d : bornage sur set_quantity() en réception, %d appliqué au lieu de %d.', $order_id, $product_id, $applied, $take ) );
+				}
 
 				// Part de la ligne qui était en commande fournisseur et vient
 				// d'arriver : elle a déjà été retirée du décompte de la ligne.
 				$converted += (int) $result['converted'];
 
-				$remaining         -= $take;
-				$allocated         += $take;
-				$report['affecte'] += $take;
+				$remaining         -= $applied;
+				$allocated         += $applied;
+				$report['affecte'] += $applied;
 			}
 
 			if ( $allocated <= 0 ) {
@@ -1262,21 +1281,27 @@ final class Allocator {
 
 				$take = min( $needed, $free[ $product_id ] );
 
-				if ( ! $dry_run ) {
-					Items::set_quantity( $item, $prepared + $take );
+				if ( $dry_run ) {
+					$applied = $take;
+				} else {
+					$applied = (int) Items::set_quantity( $item, $prepared + $take )['delta'];
+
+					if ( $applied !== $take ) {
+						Log::error( sprintf( 'Commande %d, référence #%d : bornage sur set_quantity() en réaffectation, %d appliqué au lieu de %d.', $order_id, $product_id, $applied, $take ) );
+					}
 				}
 
-				$projected[ $item_id ]              = $prepared + $take;
-				$projected_prepared[ (int) $item_id ] = $prepared + $take;
-				$free[ $product_id ]               -= $take;
-				$taken_here                        += $take;
-				$report['total']                   += $take;
+				$projected[ $item_id ]                = $prepared + $applied;
+				$projected_prepared[ (int) $item_id ] = $prepared + $applied;
+				$free[ $product_id ]                 -= $applied;
+				$taken_here                          += $applied;
+				$report['total']                     += $applied;
 
 				if ( ! isset( $report['produits'][ $product_id ] ) ) {
 					$report['produits'][ $product_id ] = 0;
 				}
 
-				$report['produits'][ $product_id ] += $take;
+				$report['produits'][ $product_id ] += $applied;
 			}
 
 			if ( $taken_here <= 0 ) {

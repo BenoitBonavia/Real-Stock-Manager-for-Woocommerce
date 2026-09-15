@@ -10,6 +10,7 @@ namespace RSMW\Preparation\Admin;
 use RSMW\Preparation\Allocator;
 use RSMW\Preparation\Config;
 use RSMW\Preparation\Demand;
+use RSMW\Preparation\FrozenHolds;
 use RSMW\Preparation\Labels;
 use RSMW\Preparation\Legacy;
 use RSMW\Preparation\OrderStatus;
@@ -124,6 +125,13 @@ final class NeedsPage {
 			self::flash( array( 'repaired' => count( $negatives ) ) );
 			self::redirect( self::current_tab() );
 		}
+
+		if ( isset( $_POST['rsmw_frozen_ack'] ) ) {
+			check_admin_referer( 'rsmw_frozen_ack' );
+
+			FrozenHolds::acknowledge_report();
+			self::redirect( self::current_tab() );
+		}
 	}
 
 	/**
@@ -171,6 +179,10 @@ final class NeedsPage {
 				'unknown_statuses' => self::unknown_statuses(),
 				'negatives'        => Stock::negative_ids(),
 				'repaired'         => isset( $flash['repaired'] ) ? (int) $flash['repaired'] : null,
+				'frozen'           => self::frozen_report_for_display( FrozenHolds::report() ),
+				// Recalcul quasi gratuit : Demand::map( false ) vient de tourner
+				// ci-dessus et a déjà rafraîchi le transient que ceci relit.
+				'unbacked_pointed' => Demand::unbacked_pointed_total(),
 				'reallocation'     => isset( $flash['reallocation'] ) ? $flash['reallocation'] : self::$reallocation,
 				'allocatable'      => Demand::allocatable_count( false ),
 				'cache_meta'       => Demand::meta(),
@@ -205,6 +217,45 @@ final class NeedsPage {
 		}
 
 		return $parents;
+	}
+
+	/**
+	 * Résout noms de référence et liens de commande pour le compte rendu de
+	 * purge des pointages gelés, pour que le gabarit n'ait qu'à afficher.
+	 *
+	 * @param array $report Compte rendu brut de FrozenHolds::report().
+	 *
+	 * @return array
+	 */
+	private static function frozen_report_for_display( array $report ): array {
+		if ( empty( $report['refs'] ) ) {
+			return $report;
+		}
+
+		Labels::prime( array_keys( $report['refs'] ) );
+
+		foreach ( $report['refs'] as $product_id => $data ) {
+			$info   = Labels::get( $product_id );
+			$orders = array();
+
+			foreach ( $data['orders'] as $order_id ) {
+				$order = wc_get_order( $order_id );
+
+				if ( ! $order instanceof \WC_Order ) {
+					continue;
+				}
+
+				$orders[] = array(
+					'num' => $order->get_order_number(),
+					'url' => $order->get_edit_order_url(),
+				);
+			}
+
+			$report['refs'][ $product_id ]['name']   = '' !== $info['variant'] ? $info['name'] . ' — ' . $info['variant'] : $info['name'];
+			$report['refs'][ $product_id ]['orders'] = $orders;
+		}
+
+		return $report;
 	}
 
 	/**

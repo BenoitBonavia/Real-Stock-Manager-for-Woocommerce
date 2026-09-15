@@ -98,9 +98,10 @@ final class Items {
 	/**
 	 * Applique une quantité préparée à une ligne et ajuste le stock physique.
 	 *
-	 * Pointer consomme le stock libre disponible ; au-delà, la ligne vaut entrée
-	 * en stock implicite et le compteur reste à zéro. Dépointer ne restitue que
-	 * ce qui avait réellement été prélevé.
+	 * Une hausse ne peut jamais prendre plus que le stock physique libre : au-delà,
+	 * elle est écrêtée et le retour (`delta`/`qty`) porte ce qui a réellement été
+	 * appliqué, pas ce qui a été demandé. Dépointer ne restitue que ce qui avait
+	 * réellement été prélevé.
 	 *
 	 * @param \WC_Order_Item_Product $item           Ligne de commande.
 	 * @param int                    $new_qty        Quantité visée.
@@ -112,10 +113,23 @@ final class Items {
 	 * @return array{delta:int, qty:int, converted:int}
 	 */
 	public static function set_quantity( $item, $new_qty, bool $supply_arrived = false ): array {
-		$max     = (int) $item->get_quantity();
-		$new_qty = max( 0, min( $max, (int) $new_qty ) );
-		$old_qty = self::prepared( $item );
-		$delta   = $new_qty - $old_qty;
+		$max        = (int) $item->get_quantity();
+		$new_qty    = max( 0, min( $max, (int) $new_qty ) );
+		$old_qty    = self::prepared( $item );
+		$delta      = $new_qty - $old_qty;
+		$product_id = self::key( $item );
+
+		/*
+		 * Une hausse ne peut prendre que ce qui existe. Aucun appelant n'a besoin
+		 * d'exception : Allocator::receive() crédite Stock en entier avant
+		 * d'allouer, les autres hausses sont déjà bornées par Stock::get() /
+		 * Stock::free_map() en amont — ce garde-fou ne mord donc que sur un
+		 * pointage manuel demandant plus que le stock libre déclaré.
+		 */
+		if ( $delta > 0 ) {
+			$delta   = min( $delta, max( 0, Stock::get( $product_id ) ) );
+			$new_qty = $old_qty + $delta;
+		}
 
 		if ( 0 === $delta ) {
 			return array(
@@ -125,17 +139,12 @@ final class Items {
 			);
 		}
 
-		$product_id = self::key( $item );
 		$from_stock = self::from_stock( $item );
 
 		if ( $delta > 0 ) {
-			$taken = min( $delta, max( 0, Stock::get( $product_id ) ) );
+			Stock::adjust( $product_id, -$delta );
 
-			if ( $taken > 0 ) {
-				Stock::adjust( $product_id, -$taken );
-			}
-
-			$from_stock += $taken;
+			$from_stock += $delta;
 		} else {
 			$returned = min( -$delta, $from_stock );
 
