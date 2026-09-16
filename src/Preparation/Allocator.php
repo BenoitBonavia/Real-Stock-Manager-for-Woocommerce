@@ -285,6 +285,14 @@ final class Allocator {
 	public static function release_if_out_of_scope( $order_id, $from = '', $to = '', $order = null ): void {
 		unset( $from );
 
+		// Neutralisée comme maybe_auto_allocate() : un traitement en lot (retrait,
+		// inventaire) fait transiter des statuts par StatusSync::sync() et ne doit
+		// pas déclencher, au milieu de la boucle, une libération globale portant
+		// sur des références qu'il n'a pas touchées.
+		if ( self::$suppressed ) {
+			return;
+		}
+
 		$tracked = array_merge( Config::statuses(), array( Legacy::STATUS_SLUG ) );
 
 		if ( in_array( (string) $to, $tracked, true ) ) {
@@ -676,6 +684,119 @@ final class Allocator {
 	}
 
 	/**
+	 * Distribue une quantité de stock physique déjà créditée, de la commande la
+	 * plus ancienne à la plus récente.
+	 *
+	 * Extrait de receive() : partagé avec credit_found_stock(), dont la seule
+	 * différence est l'origine de la marchandise (colis fournisseur ou simple
+	 * constat de comptage), portée par $supply_arrived.
+	 *
+	 * @param int    $product_id     Produit ou variation.
+	 * @param int    $qty            Quantité à distribuer.
+	 * @param bool   $supply_arrived La marchandise vient d'un colis fournisseur :
+	 *                               la part convertie n'est pas recréditée à
+	 *                               Supply, l'appelant solde lui-même le compteur
+	 *                               via son propre résidu. Transmis tel quel à
+	 *                               Items::set_quantity().
+	 * @param string $note_format    Format de la note de commande, déjà traduit,
+	 *                               avec %1$d pour la quantité et %2$s pour le
+	 *                               nom de la référence.
+	 * @param array  $report         Compte rendu, complété par référence
+	 *                               (affecte, lignes, basculees).
+	 *
+	 * @return int Quantité convertie depuis le commandé fournisseur.
+	 */
+	private static function distribute_stock( int $product_id, int $qty, bool $supply_arrived, string $note_format, array &$report ): int {
+		$remaining = $qty;
+		$converted = 0;
+
+		foreach ( Demand::active_order_ids() as $order_id ) {
+
+			if ( $remaining <= 0 ) {
+				break;
+			}
+
+			$order = wc_get_order( $order_id );
+
+			if ( ! $order instanceof \WC_Order ) {
+				continue;
+			}
+
+			$status_before = $order->get_status();
+			$allocated     = 0;
+
+			foreach ( $order->get_items() as $item ) {
+
+				if ( $remaining <= 0 ) {
+					break;
+				}
+
+				if ( Items::key( $item ) !== $product_id ) {
+					continue;
+				}
+
+				$needed = (int) $item->get_quantity() - Items::prepared( $item );
+
+				if ( $needed <= 0 ) {
+					continue;
+				}
+
+				$take   = min( $needed, $remaining );
+				$result = Items::set_quantity( $item, Items::prepared( $item ) + $take, $supply_arrived );
+
+				$applied = (int) $result['delta'];
+
+				if ( $applied !== $take ) {
+					Log::error( sprintf( 'Commande %d, référence #%d : bornage sur set_quantity(), %d appliqué au lieu de %d.', $order_id, $product_id, $applied, $take ) );
+				}
+
+				// Part de la ligne qui était en commande fournisseur et vient
+				// d'arriver : elle a déjà été retirée du décompte de la ligne.
+				$converted += (int) $result['converted'];
+
+				$remaining         -= $applied;
+				$allocated         += $applied;
+				$report['affecte'] += $applied;
+			}
+
+			if ( $allocated <= 0 ) {
+				/*
+				 * Rien pris cette passe : rattraper malgré tout une commande déjà
+				 * complète qui n'a jamais été synchronisée (aller-retour de statut,
+				 * timeout d'une réaffectation précédente). sync() est idempotente.
+				 */
+				if ( Items::order_is_ready( $order ) ) {
+					$fresh = wc_get_order( $order_id );
+
+					if ( $fresh instanceof \WC_Order && StatusSync::sync( $fresh ) !== $status_before ) {
+						$report['basculees'][] = $fresh->get_order_number();
+					}
+				}
+
+				continue;
+			}
+
+			$order = wc_get_order( $order_id );
+
+			$report['lignes'][] = self::order_summary( $order, $allocated );
+
+			$order->add_order_note(
+				sprintf(
+					$note_format,
+					$allocated,
+					wp_strip_all_tags( Labels::get( $product_id )['name'] )
+				)
+			);
+
+			if ( StatusSync::sync( $order ) !== $status_before ) {
+				$report['basculees'][] = $order->get_order_number();
+			}
+		}
+
+		return $converted;
+	}
+
+	/**
 	 * Crédite le stock libre puis affecte aux commandes les plus anciennes.
 	 *
 	 * @param int $product_id Produit ou variation.
@@ -716,92 +837,14 @@ final class Allocator {
 		// Le stock entre d'abord en entier, l'affectation le consomme ensuite.
 		Stock::adjust( $product_id, $qty );
 
-		$remaining = $qty;
-		$converted = 0;
-
-		foreach ( Demand::active_order_ids() as $order_id ) {
-
-			if ( $remaining <= 0 ) {
-				break;
-			}
-
-			$order = wc_get_order( $order_id );
-
-			if ( ! $order instanceof \WC_Order ) {
-				continue;
-			}
-
-			$status_before = $order->get_status();
-			$allocated     = 0;
-
-			foreach ( $order->get_items() as $item ) {
-
-				if ( $remaining <= 0 ) {
-					break;
-				}
-
-				if ( Items::key( $item ) !== $product_id ) {
-					continue;
-				}
-
-				$needed = (int) $item->get_quantity() - Items::prepared( $item );
-
-				if ( $needed <= 0 ) {
-					continue;
-				}
-
-				$take   = min( $needed, $remaining );
-				$result = Items::set_quantity( $item, Items::prepared( $item ) + $take, true );
-
-				$applied = (int) $result['delta'];
-
-				if ( $applied !== $take ) {
-					Log::error( sprintf( 'Commande %d, référence #%d : bornage sur set_quantity() en réception, %d appliqué au lieu de %d.', $order_id, $product_id, $applied, $take ) );
-				}
-
-				// Part de la ligne qui était en commande fournisseur et vient
-				// d'arriver : elle a déjà été retirée du décompte de la ligne.
-				$converted += (int) $result['converted'];
-
-				$remaining         -= $applied;
-				$allocated         += $applied;
-				$report['affecte'] += $applied;
-			}
-
-			if ( $allocated <= 0 ) {
-				/*
-				 * Rien pris cette passe : rattraper malgré tout une commande déjà
-				 * complète qui n'a jamais été synchronisée (aller-retour de statut,
-				 * timeout d'une réaffectation précédente). sync() est idempotente.
-				 */
-				if ( Items::order_is_ready( $order ) ) {
-					$fresh = wc_get_order( $order_id );
-
-					if ( $fresh instanceof \WC_Order && StatusSync::sync( $fresh ) !== $status_before ) {
-						$report['basculees'][] = $fresh->get_order_number();
-					}
-				}
-
-				continue;
-			}
-
-			$order = wc_get_order( $order_id );
-
-			$report['lignes'][] = self::order_summary( $order, $allocated );
-
-			$order->add_order_note(
-				sprintf(
-					/* translators: 1: quantité affectée, 2: nom de la référence. */
-					__( 'Réception fournisseur : %1$d × %2$s affecté(s) à cette commande.', 'real-stock-manager-for-woocommerce' ),
-					$allocated,
-					wp_strip_all_tags( Labels::get( $product_id )['name'] )
-				)
-			);
-
-			if ( StatusSync::sync( $order ) !== $status_before ) {
-				$report['basculees'][] = $order->get_order_number();
-			}
-		}
+		$converted = self::distribute_stock(
+			$product_id,
+			$qty,
+			true,
+			/* translators: 1: quantité affectée, 2: nom de la référence. */
+			__( 'Réception fournisseur : %1$d × %2$s affecté(s) à cette commande.', 'real-stock-manager-for-woocommerce' ),
+			$report
+		);
 
 		/*
 		 * Solde du compteur « commandé au fournisseur ».
@@ -864,6 +907,81 @@ final class Allocator {
 				$product_id,
 				$report['affecte'],
 				$converted,
+				$report['libre']
+			)
+		);
+
+		return $report;
+	}
+
+	/**
+	 * Crédite du stock physique constaté en rayon, puis l'attribue en FIFO.
+	 *
+	 * Miroir de receive() à un point près, décisif : la marchandise ne vient PAS
+	 * d'un colis fournisseur. Elle est passée à Items::set_quantity() avec
+	 * supply_arrived = false, donc la part de commande fournisseur qu'une ligne
+	 * libère en étant servie redevient du réassort non attribué au lieu d'être
+	 * effacée, et AUCUN résidu n'est soldé sur le compteur Supply. C'est ce qui
+	 * rend l'invariant « fournisseur total = libre + attribué » stable pendant ce
+	 * mouvement : corriger un comptage physique ne doit jamais faire bouger le
+	 * total commandé au fournisseur, que le marchand saisit lui-même dans le
+	 * champ voisin de l'Inventaire.
+	 *
+	 * Pas de motif en paramètre, contrairement à withdraw() : là où un retrait a
+	 * plusieurs causes distinctes à tracer (défaut, casse, perte...), une
+	 * quantité constatée en plus n'en a qu'une, déjà portée par le libellé de la
+	 * note elle-même.
+	 *
+	 * @param int $product_id Produit ou variation.
+	 * @param int $qty        Quantité constatée en plus.
+	 *
+	 * @return array{produit:int, recu:int, affecte:int, converti:int, libre:int, lignes:array, basculees:array}
+	 */
+	public static function credit_found_stock( $product_id, $qty ): array {
+		$product_id = (int) $product_id;
+		$qty        = (int) $qty;
+
+		$report = array(
+			'produit'   => $product_id,
+			'recu'      => $qty,
+			'affecte'   => 0,
+			'converti'  => 0,
+			'libre'     => 0,
+			'lignes'    => array(),
+			'basculees' => array(),
+		);
+
+		if ( $product_id <= 0 || $qty <= 0 ) {
+			return $report;
+		}
+
+		// Même solde qu'en réception : une dette héritée négative absorberait le
+		// crédit dans le plancher de Stock::adjust(), faisant disparaître des
+		// unités pourtant bel et bien constatées en rayon.
+		if ( Stock::get( $product_id ) < 0 ) {
+			Log::error( sprintf( 'Référence #%d : stock hérité négatif (%d) soldé avant crédit.', $product_id, Stock::get( $product_id ) ) );
+			Stock::set( $product_id, 0 );
+		}
+
+		Stock::adjust( $product_id, $qty );
+
+		$report['converti'] = self::distribute_stock(
+			$product_id,
+			$qty,
+			false,
+			/* translators: 1: quantité affectée, 2: nom de la référence. */
+			__( 'Correction d’inventaire : %1$d × %2$s affecté(s) à cette commande.', 'real-stock-manager-for-woocommerce' ),
+			$report
+		);
+		$report['libre']    = Stock::get( $product_id );
+
+		Demand::flush();
+		Log::info(
+			sprintf(
+				'Correction d’inventaire +%d × #%d : %d affecté(s), %d libre(s).',
+				$qty,
+				$product_id,
+				$report['affecte'],
 				$report['libre']
 			)
 		);

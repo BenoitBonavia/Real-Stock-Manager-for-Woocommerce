@@ -1,7 +1,7 @@
 <?php
 /**
- * Vue d'ensemble du catalogue : déjà attribué, stock réel, commandé et stock
- * WooCommerce, par référence.
+ * Vue d'ensemble du catalogue : totaux de stock physique et de commandé
+ * fournisseur, déjà attribué et stock WooCommerce, par référence.
  *
  * @package RealStockManager
  */
@@ -16,11 +16,15 @@ defined( 'ABSPATH' ) || exit;
  * un produit simple par référence, une variation par référence pour un produit
  * à variations — jamais le produit variable parent lui-même.
  *
- * C'est une correction DIRECTE de la valeur affichée, au même titre que les
- * champs « Stock physique libre » / « Commandé au fournisseur » de la fiche
- * produit (`ProductFields`). Ce n'est pas un mouvement : pas de sens, pas de
- * réaffectation via `Allocator`, pas d'entrée au journal ligne par ligne — un
- * seul résumé dans les journaux WooCommerce, comme `Purchase::apply()`.
+ * C'est une correction de comptage, mais c'est désormais un vrai MOUVEMENT :
+ * le marchand saisit un TOTAL (stock physique, commandé au fournisseur), et
+ * l'écart avec le total courant est routé vers `Allocator`, qui l'attribue
+ * automatiquement en FIFO/LIFO aux commandes clients en attente — exactement
+ * comme l'onglet « Mouvement à l'unité ». Une correction ici peut donc
+ * dépointer des commandes clients, en faire basculer certaines vers
+ * « À empaqueter » ou les en faire redescendre ; le compte rendu à l'écran en
+ * tient compte. Seule la fiche produit (`ProductFields`) reste une correction
+ * directe du compteur LIBRE, sans passage par `Allocator`.
  */
 final class Inventory {
 
@@ -98,36 +102,53 @@ final class Inventory {
 			$woo_stock    = self::woo_stock_for( $product );
 			$woo_editable = $product->get_stock_managed_by_id() === $id;
 
+			/*
+			 * Totaux affichés — invariants I1/I2 : le physique total et le
+			 * fournisseur total sont chacun la somme du libre et de la part déjà
+			 * attribuée à des commandes clients (`detenu` / `commande_detenu`,
+			 * scopées au périmètre détenteur par Demand::map()).
+			 *
+			 * `max( 0, … )` sur les compteurs libres : une dette héritée négative
+			 * n'est plus affichée ici — l'afficher ferait diverger le delta calculé
+			 * à l'enregistrement, puisque Allocator::receive()/credit_found_stock()
+			 * soldent la dette avant de créditer. Elle reste traitée par
+			 * Stock::negative_ids() sur la page Besoins.
+			 */
+			$free_stock  = max( 0, Stock::get( $id ) );
+			$free_supply = max( 0, Supply::get( $id ) );
+			$held_stock  = isset( $demand[ $id ]['detenu'] ) ? (int) $demand[ $id ]['detenu'] : 0;
+			$held_supply = isset( $demand[ $id ]['commande_detenu'] ) ? (int) $demand[ $id ]['commande_detenu'] : 0;
+
 			$rows[] = array(
-				'id'             => $id,
-				'name'           => $info['name'],
-				'variant'        => $info['variant'],
-				'sku'            => $info['sku'],
-				'edit'           => $info['edit'],
+				'id'                => $id,
+				'name'              => $info['name'],
+				'variant'           => $info['variant'],
+				'sku'               => $info['sku'],
+				'edit'              => $info['edit'],
 				// Taille de vignette carrée de WooCommerce, jamais 'thumbnail' :
 				// cette dernière dépend des réglages Médias de WordPress et n'est
 				// pas garantie carrée, contrairement à 'woocommerce_thumbnail'
 				// (recadrage forcé). `get_image()` retombe elle-même sur le
 				// placeholder WooCommerce si le produit n'a pas d'image — même
 				// logique que sur sa fiche.
-				'thumbnail'      => $product->get_image( 'woocommerce_thumbnail', array( 'class' => 'rsmw-thumb' ) ),
-				'libre'          => Stock::get( $id ),
-				'commande'       => Supply::get( $id ),
-				// Lecture seule : réellement prélevé sur le stock physique pour
-				// des commandes clients, « À empaqueter » comprises — ce sont
-				// justement celles qui en détiennent le plus. Ni « Stock
-				// libre » ni « Commandé » ci-dessus ne l'incluent, les deux ne
-				// comptant que le libre.
-				'attribue'       => isset( $demand[ $id ]['detenu'] ) ? (int) $demand[ $id ]['detenu'] : 0,
-				'woo_managed'    => null !== $woo_stock,
+				'thumbnail'         => $product->get_image( 'woocommerce_thumbnail', array( 'class' => 'rsmw-thumb' ) ),
+				'stock_total'       => $free_stock + $held_stock,
+				'supply_total'      => $free_supply + $held_supply,
+				// Base 100 % de la barre d'attribution : uniquement ce qui est
+				// attribué, pas le total — voir le gabarit pour le partage
+				// bleu (stock) / orange (commandé).
+				'attribue'          => $held_stock + $held_supply,
+				'attribue_stock'    => $held_stock,
+				'attribue_commande' => $held_supply,
+				'woo_managed'       => null !== $woo_stock,
 				// Distinct de woo_managed : une variation à stock mutualisé au
 				// niveau du parent AFFICHE la valeur héritée mais ne doit pas
 				// pouvoir l'ÉDITER depuis cette ligne — sinon plusieurs lignes
 				// du même formulaire s'écrasent silencieusement l'une l'autre.
-				'woo_editable'   => $woo_editable && null !== $woo_stock,
-				'woo_stock'      => $woo_stock,
-				'categories'     => wp_list_pluck( $terms, 'name' ),
-				'category_slugs' => wp_list_pluck( $terms, 'slug' ),
+				'woo_editable'      => $woo_editable && null !== $woo_stock,
+				'woo_stock'         => $woo_stock,
+				'categories'        => wp_list_pluck( $terms, 'name' ),
+				'category_slugs'    => wp_list_pluck( $terms, 'slug' ),
 			);
 		}
 
@@ -230,81 +251,288 @@ final class Inventory {
 	}
 
 	/**
-	 * Enregistre les corrections saisies.
+	 * Plafond de références routées vers `Allocator` par soumission.
 	 *
-	 * N'écrit que les valeurs qui diffèrent réellement de celles en base : le
-	 * formulaire soumet TOUTES les références, filtrées ou non côté client, et
-	 * la grande majorité n'aura pas été touchée.
-	 *
-	 * @param array<int, array{libre?:int, commande?:int, woo?:int}> $rows Saisie, indexée par référence.
-	 *
-	 * @return array{changed:int}
+	 * Chaque appel parcourt les commandes actives (`wc_get_orders( limit => -1 )`
+	 * puis chargement des commandes concernées), dans un POST exécuté sur
+	 * `load-{écran}` avant l'envoi des en-têtes. Au-delà, la référence est
+	 * comptée en `skipped` et reprise à la soumission suivante — le verrou
+	 * optimiste (voir `$refs` ci-dessous) rend cette reprise sûre.
 	 */
-	public static function apply( array $rows ): array {
-		$changed = 0;
+	private const MAX_MOVEMENTS = 100;
 
-		foreach ( $rows as $product_id => $values ) {
-			$product_id = (int) $product_id;
+	/**
+	 * Enregistre les totaux saisis, comme un mouvement de stock.
+	 *
+	 * L'écart entre le total saisi et le total courant (`Stock::get()` /
+	 * `Supply::get()` relus en base, jamais `$refs`) est routé vers `Allocator`,
+	 * qui l'attribue automatiquement en FIFO (hausse) ou reprend en LIFO
+	 * (baisse) — la répartition libre/attribué n'est jamais décidée ici.
+	 *
+	 * Ordre par ligne : stock d'abord, commandé fournisseur ensuite. Un
+	 * mouvement de stock peut convertir du commandé attribué en préparé
+	 * (`Items::set_quantity()`), ce qui change le total commandé courant AVANT
+	 * que son propre champ ne soit traité.
+	 *
+	 * @param array<int, array{stock?:int, supply?:int, woo?:int}> $rows Saisie, indexée par référence.
+	 * @param array<int, array{stock:int, supply:int}>             $refs Totaux affichés au rendu du formulaire — verrou optimiste, jamais base du delta.
+	 *
+	 * @return array{changed:int, moved:int, conflicts:int, skipped:int, missing:int, lines:array<int, array<string,mixed>>, switched:string[], dropped:string[], truncated:bool}
+	 */
+	public static function apply( array $rows, array $refs ): array {
+		$demand = Demand::map( false ); // Un seul instantané, jamais relu dans la boucle.
+		$reason = __( 'correction d’inventaire', 'real-stock-manager-for-woocommerce' );
 
-			if ( $product_id <= 0 || ! is_array( $values ) ) {
-				continue;
-			}
+		return Allocator::without_auto_allocation(
+			static function () use ( $rows, $refs, $demand, $reason ) {
+				$report = array(
+					'changed'   => 0,
+					'moved'     => 0,
+					'conflicts' => 0,
+					'skipped'   => 0,
+					'missing'   => 0,
+					'lines'     => array(),
+					'switched'  => array(),
+					'dropped'   => array(),
+					'truncated' => false,
+				);
 
-			$touched = false;
+				$movements = 0;
 
-			/*
-			 * Comparaison sur la valeur SIGNÉE, contre un Stock::get()/
-			 * Supply::get() lui-même potentiellement négatif pour une
-			 * référence héritée : une ligne que le marchand n'a pas touchée
-			 * revient donc identique à sa valeur en base, et ne déclenche
-			 * aucune écriture. Écrêter la comparaison à zéro écrirait 0 à la
-			 * place de la dette au moindre enregistrement du formulaire, y
-			 * compris sur des lignes jamais éditées. Stock::set()/
-			 * Supply::set() plafonnent déjà à zéro à l'écriture elle-même —
-			 * rien à faire ici pour une correction réellement voulue.
-			 */
-			if ( isset( $values['libre'] ) ) {
-				$libre = (int) $values['libre'];
+				foreach ( $rows as $id => $values ) {
+					$id = (int) $id;
 
-				if ( $libre !== Stock::get( $product_id ) ) {
-					Stock::set( $product_id, $libre );
-					$touched = true;
+					if ( $id <= 0 || ! is_array( $values ) || ! isset( $refs[ $id ] ) ) {
+						++$report['skipped'];
+						continue;
+					}
+
+					$row_changed = false;
+					$row_moved   = false;
+
+					/*
+					 * Stock physique — invariant I1 : total = libre + détenu. Le
+					 * `restant` de l'instantané mesure ce qu'il reste à préparer
+					 * AVANT tout mouvement de cette ligne : encore valide ici,
+					 * périmé dès qu'un mouvement de stock a eu lieu (voir plus bas).
+					 */
+					$free_stock  = max( 0, Stock::get( $id ) );
+					$held_stock  = isset( $demand[ $id ]['detenu'] ) ? (int) $demand[ $id ]['detenu'] : 0;
+					$stock_total = $free_stock + $held_stock;
+					$pending     = isset( $demand[ $id ]['restant'] ) ? (int) $demand[ $id ]['restant'] : 0;
+
+					/*
+					 * Commandé fournisseur — invariant I2 : total = libre + détenu.
+					 * Calculé ICI, avant tout mouvement de stock sur cette ligne, et
+					 * pas recalculé plus bas : un mouvement de stock (credit_found_stock())
+					 * peut convertir du commandé attribué en préparé, ce qui fait
+					 * MONTER Supply::get() (libre) et BAISSER `commande_detenu` (détenu)
+					 * d'autant — le TOTAL est invariant, mais seulement si les deux
+					 * moitiés sont lues au même instant. Les recalculer séparément à
+					 * deux moments différents (libre relu frais après le mouvement,
+					 * détenu resté à sa valeur d'avant) gonflerait le total à tort et
+					 * ferait échouer le verrou optimiste sur une ligne pourtant
+					 * légitime.
+					 */
+					$held_supply  = isset( $demand[ $id ]['commande_detenu'] ) ? (int) $demand[ $id ]['commande_detenu'] : 0;
+					$supply_total = max( 0, Supply::get( $id ) ) + $held_supply;
+
+					if ( isset( $values['stock'] ) && $values['stock'] !== $refs[ $id ]['stock'] ) {
+
+						if ( $refs[ $id ]['stock'] !== $stock_total ) {
+							// L'état a changé depuis le rendu du formulaire (rejeu de
+							// POST, double-clic, deux onglets) : toute la ligne est
+							// sautée, stock ET commandé, plutôt que d'appliquer un
+							// delta calculé sur une base périmée.
+							++$report['conflicts'];
+							continue;
+						}
+
+						if ( ! wc_get_product( $id ) ) {
+							++$report['skipped'];
+							continue;
+						}
+
+						if ( $movements >= self::MAX_MOVEMENTS ) {
+							++$report['skipped'];
+							continue;
+						}
+
+						$delta = (int) $values['stock'] - $stock_total;
+
+						if ( 0 !== $delta ) {
+							if ( $delta > 0 && 0 === $pending ) {
+								// I6 : personne n'attend cette référence, rien à
+								// attribuer — écriture directe, sans parcourir les
+								// commandes actives.
+								Stock::set( $id, $free_stock + $delta );
+							} elseif ( $delta > 0 ) {
+								self::merge_stock_report( $report, Allocator::credit_found_stock( $id, $delta ) );
+								++$movements;
+								$row_moved = true;
+							} elseif ( -$delta <= $free_stock ) {
+								// Le retrait tient entièrement dans le libre :
+								// aucune commande touchée.
+								Stock::set( $id, $free_stock + $delta );
+							} else {
+								self::merge_stock_report( $report, Allocator::withdraw( $id, -$delta, $reason ) );
+								++$movements;
+								$row_moved = true;
+							}
+
+							$row_changed = true;
+						}
+					}
+
+					if ( isset( $values['supply'] ) && $values['supply'] !== $refs[ $id ]['supply'] ) {
+
+						if ( $refs[ $id ]['supply'] !== $supply_total ) {
+							++$report['conflicts'];
+							continue;
+						}
+
+						if ( ! wc_get_product( $id ) ) {
+							++$report['skipped'];
+							continue;
+						}
+
+						if ( $movements >= self::MAX_MOVEMENTS ) {
+							++$report['skipped'];
+							continue;
+						}
+
+						$delta = (int) $values['supply'] - $supply_total;
+
+						// Relu frais, APRÈS un éventuel mouvement de stock sur cette
+						// même ligne : la conversion commandé->préparé a pu déplacer
+						// des unités du détenu vers le libre (voir plus haut). $delta,
+						// lui, reste correct : il porte sur $supply_total, invariant.
+						$free_supply = max( 0, Supply::get( $id ) );
+
+						// Le raccourci « rien à réserver » n'est valable que si
+						// AUCUN mouvement de stock n'a eu lieu sur cette même ligne :
+						// sinon $pending est périmé. order_from_supplier() et
+						// cancel_supplier_order() se recalculent eux-mêmes, ils
+						// restent toujours sûrs.
+						if ( 0 !== $delta ) {
+							if ( $delta > 0 && ! $row_moved && 0 === $pending ) {
+								Supply::set( $id, $free_supply + $delta );
+							} elseif ( $delta > 0 ) {
+								self::merge_supply_report( $report, Allocator::order_from_supplier( $id, $delta ) );
+								++$movements;
+								$row_moved = true;
+							} elseif ( -$delta <= $free_supply ) {
+								Supply::set( $id, $free_supply + $delta );
+							} else {
+								self::merge_supply_report( $report, Allocator::cancel_supplier_order( $id, -$delta ) );
+								++$movements;
+								$row_moved = true;
+							}
+
+							$row_changed = true;
+						}
+					}
+
+					if ( isset( $values['woo'] ) && self::apply_woo_stock( $id, (int) $values['woo'] ) ) {
+						$row_changed = true;
+					}
+
+					if ( $row_changed ) {
+						++$report['changed'];
+					}
+
+					if ( $row_moved ) {
+						++$report['moved'];
+					}
 				}
-			}
 
-			if ( isset( $values['commande'] ) ) {
-				$commande = (int) $values['commande'];
+				$report['truncated'] = count( $report['lines'] ) > 20 || count( $report['switched'] ) > 20 || count( $report['dropped'] ) > 20;
+				$report['lines']     = array_slice( $report['lines'], 0, 20 );
+				$report['switched']  = array_slice( array_unique( $report['switched'] ), 0, 20 );
+				$report['dropped']   = array_slice( array_unique( $report['dropped'] ), 0, 20 );
 
-				if ( $commande !== Supply::get( $product_id ) ) {
-					Supply::set( $product_id, $commande );
-					$touched = true;
+				if ( $report['changed'] > 0 ) {
+					// Le compteur « unités affectables » dépend de Stock::free_map() ;
+					// sans ce flush, il resterait périmé jusqu'à l'expiration de son
+					// propre transient. Les mouvements Allocator l'ont déjà fait
+					// individuellement, ce flush couvre aussi les écritures directes.
+					Demand::flush();
 				}
-			}
 
-			if ( isset( $values['woo'] ) && self::apply_woo_stock( $product_id, (int) $values['woo'] ) ) {
-				$touched = true;
-			}
+				Log::info(
+					sprintf(
+						'Inventaire mis à jour : %d référence(s) modifiée(s), %d mouvement(s), %d conflit(s), %d ligne(s) reportée(s), %d unité(s) manquante(s).',
+						$report['changed'],
+						$report['moved'],
+						$report['conflicts'],
+						$report['skipped'],
+						$report['missing']
+					)
+				);
 
-			if ( $touched ) {
-				++$changed;
+				return $report;
 			}
+		);
+	}
+
+	/**
+	 * Fusionne le compte rendu d'un mouvement de stock physique
+	 * (`Allocator::credit_found_stock()` / `Allocator::withdraw()`) dans le
+	 * compte rendu global de l'Inventaire.
+	 *
+	 * @param array $report Compte rendu global, complété par référence.
+	 * @param array $moved  Compte rendu du mouvement.
+	 */
+	private static function merge_stock_report( array &$report, array $moved ): void {
+		if ( ! empty( $moved['lignes'] ) ) {
+			array_push( $report['lines'], ...$moved['lignes'] );
 		}
 
-		if ( $changed > 0 ) {
-			// Le compteur « unités affectables » dépend de Stock::free_map() ;
-			// sans ce flush, il resterait périmé jusqu'à l'expiration de son
-			// propre transient.
-			Demand::flush();
+		if ( ! empty( $moved['basculees'] ) ) {
+			array_push( $report['switched'], ...$moved['basculees'] );
+		}
 
-			Log::info(
+		if ( ! empty( $moved['rendues'] ) ) {
+			array_push( $report['dropped'], ...$moved['rendues'] );
+		}
+
+		if ( ! empty( $moved['manquant'] ) ) {
+			$report['missing'] += (int) $moved['manquant'];
+
+			Log::error(
 				sprintf(
-					'Inventaire mis à jour : %d référence(s) modifiée(s).',
-					$changed
+					'Correction d’inventaire, référence #%d : %d unité(s) n’ont pas pu être retirées, le total obtenu reste supérieur au total saisi.',
+					(int) $moved['produit'],
+					(int) $moved['manquant']
 				)
 			);
 		}
+	}
 
-		return array( 'changed' => $changed );
+	/**
+	 * Fusionne le compte rendu d'un mouvement de commandé fournisseur
+	 * (`Allocator::order_from_supplier()` / `Allocator::cancel_supplier_order()`)
+	 * dans le compte rendu global de l'Inventaire.
+	 *
+	 * @param array $report Compte rendu global, complété par référence.
+	 * @param array $moved  Compte rendu du mouvement.
+	 */
+	private static function merge_supply_report( array &$report, array $moved ): void {
+		if ( ! empty( $moved['lignes'] ) ) {
+			array_push( $report['lines'], ...$moved['lignes'] );
+		}
+
+		if ( ! empty( $moved['manquant'] ) ) {
+			$report['missing'] += (int) $moved['manquant'];
+
+			Log::error(
+				sprintf(
+					'Correction d’inventaire, référence #%d : %d unité(s) commandées n’ont pas pu être annulées, le total obtenu reste supérieur au total saisi.',
+					(int) $moved['produit'],
+					(int) $moved['manquant']
+				)
+			);
+		}
 	}
 
 	/**

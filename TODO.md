@@ -266,11 +266,14 @@ d'unités qui vont apparaître et exiger une confirmation explicite.
   publish/private/draft) mais reste compté dans `Valuation::compute()` et
   dans `Demand::allocatable_count()`, jusqu'au vidage automatique à 30 jours
   où le compteur s'évapore sans trace.
-- **C5** (`Reception.php:363`, `Purchase.php:198`, `Inventory.php:231`) :
-  ces trois normaliseurs de saisie castent la clé en entier sans jamais
-  appeler `wc_get_product()` — contrairement à `StockPage::resolve_product()`
-  qui, lui, valide. Un produit supprimé entre la génération de l'écran et la
-  soumission du formulaire crée un postmeta orphelin sur un `post_id` mort.
+- **C5** (`Reception.php:363`, `Purchase.php:198`) : ces deux normaliseurs de
+  saisie castent la clé en entier sans jamais appeler `wc_get_product()` —
+  contrairement à `StockPage::resolve_product()` qui, lui, valide. Un produit
+  supprimé entre la génération de l'écran et la soumission du formulaire crée
+  un postmeta orphelin sur un `post_id` mort. **Soldé pour l'Inventaire**
+  (refonte « saisie de totaux », v3.7.0) : `Inventory::apply()` appelle
+  désormais `wc_get_product( $id )` avant tout mouvement, qu'il passe par
+  `Allocator` ou par une écriture directe.
 
 **Correctif proposé** : accrocher `woocommerce_before_delete_product_variation`
 et `before_delete_post` (filtré sur `product`/`product_variation`) pour
@@ -315,6 +318,18 @@ dans `Stock::free_map()`, `Supply::free_map()`, `Stock::negative_ids()`.
   `StatusSync::sync`). Fenêtre étroite mais réelle (suppression concurrente,
   hooks tiers sur `rsmw_line_prepared` invalidant le cache commande entre les
   deux lectures).
+
+**Note (v3.7.0)** : la refonte de l'onglet Inventaire en « saisie de totaux »
+a doté `Inventory::apply()` (`src/Preparation/Inventory.php`) de son propre
+verrou optimiste (un champ caché `rsmw_inventory_ref` porte les totaux affichés
+au rendu, comparés au total courant avant tout mouvement) et d'un plafond
+`MAX_MOVEMENTS = 100` de références routées vers `Allocator` par soumission —
+au-delà, la ligne est reportée à la soumission suivante plutôt que de risquer
+un timeout PHP en plein POST. C'est une réponse **locale** au motif F3, pas
+une correction de F1/F2/F4/F5 eux-mêmes : `Stock::adjust()`/`Supply::adjust()`
+restent des read-modify-write sans verrou inter-processus, et `Reception::apply()`
+n'a pas reçu le même traitement. Un futur chantier F3 pourrait reprendre le
+même schéma (champ caché de référence + plafond + bouton désactivé côté JS).
 
 **Correctif proposé** : remplacer `Stock::adjust()`/`Supply::adjust()` par un
 `UPDATE ... SET meta_value = GREATEST(0, CAST(meta_value AS SIGNED) + %d)`

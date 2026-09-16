@@ -139,8 +139,11 @@ final class Pages {
 		if ( $screens['stock'] === $hook_suffix ) {
 
 			if ( StockPage::TAB_INVENTORY === StockPage::current_tab() ) {
-				// Pas de journal sur cet onglet : ce n'est pas un mouvement
-				// ligne à ligne, mais une correction directe en lot.
+				// Pas de journal sur cet onglet : les corrections y sont
+				// désormais de vrais mouvements (voir Inventory::apply()),
+				// mais en lot — un seul inventaire écraserait les 200 entrées
+				// de Journal::MAX_ENTRIES. Le compte rendu à l'écran et les
+				// notes posées sur les commandes par Allocator en tiennent lieu.
 				wp_enqueue_script(
 					'rsmw-inventory-table',
 					RSMW_URL . 'assets/js/inventory-table.js',

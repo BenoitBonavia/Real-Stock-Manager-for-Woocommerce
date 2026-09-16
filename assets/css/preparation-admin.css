@@ -26,6 +26,8 @@
 	--rsmw-positive: #00a32a;
 	--rsmw-negative: #b32d2e;
 	--rsmw-warning: #dba617;
+	/* Bleu : prélevé sur le stock physique pour une commande cliente. */
+	--rsmw-prepared: #6d4aff;
 	/* Orange : commandé au fournisseur, pas encore reçu. */
 	--rsmw-ordered: #d98500;
 	--rsmw-pad: 16px 24px;
@@ -504,6 +506,84 @@
 .rsmw-ordered {
 	color: var(--rsmw-ordered);
 	font-weight: 600;
+}
+
+/*
+ * Barre d'attribution de l'onglet Inventaire (« Déjà attribué »).
+ *
+ * Base 100 % = le total attribué, jamais le total de la référence : la piste
+ * est TOUJOURS pleine, seul le partage entre les deux segments varie. Bleu
+ * (--rsmw-prepared) = prélevé sur le stock physique, orange (--rsmw-ordered) =
+ * couvert par une commande fournisseur — mêmes teintes que la colonne
+ * « Préparation » de la liste des commandes (order-status.css), classes
+ * distinctes parce que le dénominateur, lui, n'est pas le même (là-bas : la
+ * quantité de la commande, pas le total attribué).
+ *
+ * Disposition empilée, pas en ligne : la colonne chiffrée est plafonnée par
+ * .rsmw-table th.rsmw-num, une piste suivie de deux nombres l'élargirait au
+ * détriment de la colonne Référence.
+ */
+.rsmw-alloc {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+}
+
+.rsmw-alloc__track {
+	width: 52px;
+	height: 6px;
+	border-radius: 99px;
+	/* Même gris que .rsmw-gauge__track ci-dessous : piste de jauge, pas fond de
+	   page — --rsmw-canvas est réservé à ce second usage. */
+	background: #e6e6ec;
+	overflow: hidden;
+	display: inline-flex;
+}
+
+.rsmw-alloc__fill--stock,
+.rsmw-alloc__fill--ordered {
+	display: block;
+	height: 100%;
+	flex: none;
+}
+
+.rsmw-alloc__fill--stock {
+	background: var(--rsmw-prepared);
+}
+
+.rsmw-alloc__fill--ordered {
+	background: var(--rsmw-ordered);
+}
+
+.rsmw-alloc__label {
+	font-variant-numeric: tabular-nums;
+	color: var(--rsmw-text-muted);
+}
+
+.rsmw-alloc__ordered {
+	color: var(--rsmw-ordered);
+	font-weight: 600;
+}
+
+/*
+ * Seconde signature, non chromatique : en contraste forcé, les deux segments
+ * doivent rester distinguables. L'information reste de toute façon portée par
+ * les CHIFFRES et par le texte pour lecteur d'écran, jamais par la seule
+ * couleur.
+ */
+@media ( forced-colors: active ) {
+	.rsmw-alloc__track {
+		border: 1px solid CanvasText;
+	}
+
+	.rsmw-alloc__fill--stock {
+		background: Highlight;
+	}
+
+	.rsmw-alloc__fill--ordered {
+		background: CanvasText;
+	}
 }
 
 /* Jauge de taux — « Besoins Back in Stock ». Décorative (aria-hidden) : le

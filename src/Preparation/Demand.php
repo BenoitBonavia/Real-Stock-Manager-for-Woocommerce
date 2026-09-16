@@ -106,17 +106,17 @@ final class Demand {
 	/**
 	 * Table des besoins : une entrée par référence.
 	 *
-	 * `detenu` est calculé sur un périmètre plus large que le reste de la
-	 * ligne (`holder_order_ids()`, qui inclut les commandes « À empaqueter »)
-	 * : c'est la seule clé qui mesure ce qui est physiquement immobilisé,
-	 * peu importe que la commande ait encore quelque chose à préparer. Les
-	 * autres clés restent scopées à `active_order_ids()` : une commande
-	 * « À empaqueter » n'a plus rien à préparer, l'y inclure fausserait
-	 * `restant`/`commande`/`plus_vieux`.
+	 * `detenu` et `commande_detenu` sont calculées sur un périmètre plus large
+	 * que le reste de la ligne (`holder_order_ids()`, qui inclut les commandes
+	 * « À empaqueter ») : ce sont les deux seules clés qui mesurent ce qui est
+	 * physiquement ou contractuellement immobilisé, peu importe que la commande
+	 * ait encore quelque chose à préparer. Les autres clés restent scopées à
+	 * `active_order_ids()` : une commande « À empaqueter » n'a plus rien à
+	 * préparer, l'y inclure fausserait `restant`/`commande`/`plus_vieux`.
 	 *
 	 * @param bool $use_cache Lire le cache si disponible.
 	 *
-	 * @return array<int, array{demande:int, pointe:int, restant:int, commande:int, commandes:int, plus_vieux:?int, parent:int, detenu:int, pointe_detenu:int}>
+	 * @return array<int, array{demande:int, pointe:int, restant:int, commande:int, commandes:int, plus_vieux:?int, parent:int, detenu:int, pointe_detenu:int, commande_detenu:int}>
 	 */
 	public static function map( bool $use_cache = true ): array {
 		if ( $use_cache ) {
@@ -188,14 +188,15 @@ final class Demand {
 
 			if ( ! isset( $map[ $key ] ) ) {
 				$map[ $key ] = array(
-					'demande'       => 0,
-					'pointe'        => 0,
-					'restant'       => 0,
-					'commande'      => 0,
-					'commandes'     => array(),
-					'plus_vieux'    => null,
-					'detenu'        => 0,
-					'pointe_detenu' => 0,
+					'demande'         => 0,
+					'pointe'          => 0,
+					'restant'         => 0,
+					'commande'        => 0,
+					'commandes'       => array(),
+					'plus_vieux'      => null,
+					'detenu'          => 0,
+					'pointe_detenu'   => 0,
+					'commande_detenu' => 0,
 
 					/*
 					 * Produit parent d'une variation, égal à la clé pour un produit
@@ -225,6 +226,20 @@ final class Demand {
 
 			$map[ $key ]['detenu']        += min( $quantity, $src_raw );
 			$map[ $key ]['pointe_detenu'] += min( $quantity, $prepared_raw );
+
+			/*
+			 * Part de la ligne couverte par une commande fournisseur, sur le
+			 * périmètre DÉTENTEUR — c'est le Σ ordered de l'invariant I2.
+			 * Distincte de `commande` plus bas, qui ne compte que les commandes
+			 * encore actives : une commande « À empaqueter » peut conserver un
+			 * _rsmw_prep_ordered non nul (l'action groupée native bascule sans
+			 * rien pointer, et la sortie en avance de Items::set_quantity() sur
+			 * delta = 0 ne convertit rien), et reclaim_ordered_from_holders()
+			 * le reprend. Les deux clés doivent exister : `commande` mesure ce
+			 * qu'il reste à recevoir pour servir, `commande_detenu` mesure ce
+			 * qui est immobilisé.
+			 */
+			$map[ $key ]['commande_detenu'] += max( 0, min( $quantity - min( $quantity, $prepared_raw ), max( 0, (int) $row->ord ) ) );
 
 			// Le reste ne concerne que les commandes encore actives : une
 			// commande « À empaqueter » n'a plus rien à préparer.

@@ -3,6 +3,12 @@
  *
  * Même principe que `needs-table.js` : le tableau est complet dès le
  * chargement, tout se joue côté client sur les lignes déjà rendues.
+ *
+ * Le tri lit `row.dataset[ th.dataset.key ]` : chaque `data-key` d'un `<th>`
+ * doit donc avoir un `data-{clé}` strictement identique sur le `<tr>`, et être
+ * un mot simple sans tiret — `data-key="attribue-stock"` se lirait
+ * `dataset.attribueStock` (camelCase), jamais `dataset['attribue-stock']`, et
+ * le tri échouerait silencieusement (aucune erreur, juste rien qui ne trie).
  */
 ( function () {
 	'use strict';
@@ -92,4 +98,24 @@
 			input.classList.toggle( 'rsmw-lack', ! isNaN( value ) && value <= 0 );
 		} );
 	} );
+
+	/*
+	 * Désactivé au premier submit, pas empêché : le verrou optimiste côté
+	 * serveur (StockPage::read_inventory_refs()) couvre déjà un rejeu de POST
+	 * sans risque d'écriture double, ceci évite seulement qu'un double-clic
+	 * ne revienne avec un compte rendu plein de « conflits » sans raison.
+	 */
+	var form = document.getElementById( 'rsmw-inventory-form' );
+
+	if ( form ) {
+		form.addEventListener( 'submit', function () {
+			var submit = form.querySelector( '[name="rsmw_inventory_submit"]' );
+
+			if ( submit ) {
+				window.setTimeout( function () {
+					submit.disabled = true;
+				}, 0 );
+			}
+		} );
+	}
 }() );

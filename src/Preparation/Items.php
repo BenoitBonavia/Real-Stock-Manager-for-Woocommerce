@@ -52,13 +52,19 @@ final class Items {
 	 * @return int
 	 */
 	public static function from_stock( $item ): int {
+		$max = (int) $item->get_quantity();
 		$raw = $item->get_meta( Legacy::ITEM_SOURCE_META );
 
 		if ( '' === $raw || null === $raw ) {
-			return self::prepared( $item );
+			return min( $max, self::prepared( $item ) );
 		}
 
-		return max( 0, (int) $raw );
+		// Borné par la quantité de la ligne, comme Demand::map() le fait déjà
+		// pour `detenu` : une ligne ne peut pas détenir plus que ce que le
+		// client a commandé. Sans ce plafond, une quantité réduite hors admin
+		// (REST, abonnements) laisse une part prélevée fantôme que plus aucun
+		// retrait ne sait rendre.
+		return max( 0, min( $max, (int) $raw ) );
 	}
 
 	/**

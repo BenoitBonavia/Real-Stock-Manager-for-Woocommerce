@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.6.1
+Stable tag: 3.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,11 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.7.0 =
+* Évolution : sur l'onglet « Inventaire », les colonnes « Stock libre » et « Commandé (non affecté) » sont remplacées par « Stock physique (total) » et « Commandé au fournisseur (total) » — le marchand saisit désormais ce qu'il compte réellement (rayon compris, articles déjà mis de côté pour des commandes inclus), et non plus un solde à calculer de tête. L'écart avec le total courant est attribué automatiquement aux commandes clients en attente, comme sur l'onglet « Mouvement à l'unité ».
+* Évolution : la colonne « Déjà attribué » devient une barre bicolore — bleu pour la part prélevée sur le stock physique, orange pour la part couverte par une commande fournisseur — au lieu d'un simple nombre.
+* Correctif : une ligne de commande dont la quantité était réduite en dehors de l'administration (API REST, abonnements) pouvait garder une part « prélevée sur le stock » supérieure à sa propre quantité, rendant la correction impossible depuis l'Inventaire.
 
 = 3.6.1 =
 * Correctif urgent : une commande normalement préparée puis marquée « Terminée » (expédiée) recréditait son stock au libre, comme si la marchandise n'était jamais sortie — au lieu de ne restituer le stock qu'aux commandes annulées, remboursées, en échec ou à la corbeille, où la marchandise est réellement restée en rayon. Ce bug, actif depuis la version précédente, fabriquait du stock fantôme en continu à chaque commande expédiée.

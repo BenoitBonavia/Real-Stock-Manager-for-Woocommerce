@@ -192,7 +192,7 @@ Les formulaires sont traités sur `load-{écran}`, avant l'envoi de l'en-tête d
 seule fenêtre où une redirection reste possible. Sans elle, un rafraîchissement rejouerait
 l'écriture, et sur une réception en lot c'est un colis entier qui serait enregistré deux fois.
 
-### Inventaire : correction directe, pas un mouvement
+### Inventaire : un mouvement en lot, sur des totaux
 
 Les deux autres onglets sont **demand-driven** : ils ne listent que des références déjà engagées
 dans une commande client ou fournisseur. L'onglet Inventaire (`RSMW\Preparation\Inventory`) est le
@@ -202,13 +202,29 @@ Aucune fonction WooCommerce ne permet de mélanger `product` et `product_variati
 appel : la liste vient d'une requête SQL directe sur `wp_posts`, dans l'esprit de
 `BackInStock\Demand`.
 
-C'est une correction **directe** de la valeur affichée, au même titre que les champs « Stock
-physique libre » / « Commandé au fournisseur » de la fiche produit (`ProductFields`) — pas un
-mouvement : aucun passage par `Allocator` (pas de sens, pas de réaffectation FIFO aux commandes
-clients), aucune entrée au journal ligne par ligne. `Inventory::apply()` n'écrit **que les valeurs
-qui diffèrent réellement** de celles en base, un seul `Log::info()` récapitulatif à la fin — le
-formulaire soumet tout le catalogue à chaque enregistrement, filtré ou non côté client, et la
-quasi-totalité des lignes n'aura pas été touchée.
+Les deux champs saisissables portent des **TOTAUX**, pas des soldes : « Stock physique (total) » et
+« Commandé au fournisseur (total) » sont chacun la somme du libre (`Stock::get()` / `Supply::get()`)
+et de la part déjà attribuée à des commandes clients (`detenu` / `commande_detenu` de
+`Demand::map()`). Le marchand saisit ce qu'il compte réellement — rayon compris, articles déjà mis
+de côté pour des commandes inclus — sans avoir à en soustraire mentalement ce qui est engagé.
+
+C'est désormais un vrai **mouvement**, pas une correction directe : l'écart entre le total saisi et
+le total courant est routé vers `Allocator` (`credit_found_stock()` / `withdraw()` pour le stock,
+`order_from_supplier()` / `cancel_supplier_order()` pour le commandé), qui l'attribue automatiquement
+en FIFO (hausse) ou reprend en LIFO (baisse) aux commandes clients en attente — sans aucun réglage
+manuel possible depuis cet écran. Une hausse peut donc faire basculer une commande vers
+« À empaqueter », une baisse peut l'en faire redescendre ; le compte rendu affiché après
+enregistrement le signale. Une correction qui n'a besoin de toucher aucune commande (aucun reste à
+préparer, ou retrait tenant entièrement dans le libre) reste une écriture directe, sans le coût d'un
+parcours des commandes actives. Pas d'entrée au journal ligne par ligne pour autant — un inventoire
+complet écraserait les 200 entrées de `Journal::MAX_ENTRIES` — la traçabilité passe par les notes de
+commande qu'`Allocator` pose déjà et par un `Log::info()`/`Log::error()` récapitulatif.
+
+Un verrou optimiste protège l'enregistrement : chaque valeur affichée au rendu du formulaire est
+transportée dans un champ caché compact, et sert à détecter un état qui a changé depuis (rejeu de
+POST, double-clic, deux onglets ouverts) — la ligne concernée est alors sautée plutôt que d'appliquer
+un delta calculé sur une base périmée. Le delta lui-même n'est jamais calculé contre ce champ caché,
+toujours contre `Stock::get()`/`Supply::get()` relus en base.
 
 Catalogue de quelques centaines de références ou moins : recherche, filtre par catégorie
 (`product_cat`) et tri se font entièrement côté navigateur (`assets/js/inventory-table.js`), sans
@@ -234,12 +250,19 @@ repli sur l'image du produit parent pour une variation qui n'en a pas, puis sur 
 WooCommerce : aucune logique de repli à écrire côté plugin.
 
 Une dernière colonne, **« Déjà attribué »**, est en LECTURE SEULE — volontairement, contrairement
-aux trois autres. Elle reprend `pointe` de `Demand::map()` (`src/Preparation/Demand.php`), la
-même donnée que la colonne « Pointé » de « Besoins pour commande » : ce qui est déjà prélevé sur
-des commandes clients en attente. Ni « Stock réel » ni « Commandé » ne l'incluent — les deux ne
-comptent que le libre — donc l'afficher à part évite de laisser croire qu'une référence est vide
-alors qu'elle est simplement déjà engagée. La rendre éditable n'aurait pas de sens : ce nombre se
-déduit des commandes, il ne se corrige pas à la main.
+aux deux totaux. Elle se lit comme une barre à deux segments plutôt qu'un simple nombre, base 100 %
+= le total attribué (jamais le total de la référence) : bleu pour la part prélevée sur le stock
+physique (`detenu` de `Demand::map()`), orange pour la part couverte par une commande fournisseur
+(`commande_detenu`, scopée au même périmètre détenteur — commandes actives et « À empaqueter »). Une
+référence entièrement couverte par du stock physique affiche une barre bleue et un seul chiffre ;
+dès qu'une part vient du commandé, la barre se partage et affiche les deux chiffres. La rendre
+éditable n'aurait pas de sens : ce qu'elle montre se déduit des commandes, il ne se corrige pas à la
+main — seuls les deux totaux à sa gauche se corrigent, et c'est leur correction qui la fait bouger.
+
+**Divergence assumée avec la fiche produit** (`ProductFields`) : ses champs « Stock physique libre »
+/ « Commandé au fournisseur » restent, eux, une correction directe du compteur LIBRE, sans passage
+par `Allocator`. Les deux écrans affichent donc des nombres différents pour la même référence dès
+qu'elle détient quelque chose — seuls les libellés (« libre » contre « (total) ») les distinguent.
 
 ### Réception : ce qu'un défectueux ne doit pas faire
 

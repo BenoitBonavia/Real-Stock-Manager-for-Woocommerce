@@ -191,7 +191,16 @@ final class StockPage {
 		if ( isset( $_POST['rsmw_inventory_submit'] ) ) {
 			check_admin_referer( self::NONCE_INVENTORY );
 
-			$report = Inventory::apply( self::read_inventory_input() );
+			$rows   = self::read_inventory_input();
+			$report = Inventory::apply( $rows, self::read_inventory_refs() );
+
+			// Troncature silencieuse de PHP au-delà de max_input_vars (1000 par
+			// défaut) : mieux vaut le signaler que laisser croire à un
+			// enregistrement complet du catalogue.
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié ci-dessus.
+			$expected = isset( $_POST['rsmw_inventory_count'] ) ? absint( wp_unslash( $_POST['rsmw_inventory_count'] ) ) : 0;
+
+			$report['truncated_post'] = $expected > 0 && count( $rows ) < $expected;
 
 			self::flash( array( 'inventory' => $report ) );
 			self::redirect( self::TAB_INVENTORY );
@@ -474,7 +483,7 @@ final class StockPage {
 	 *
 	 * Le nonce est vérifié par l'appelant.
 	 *
-	 * @return array<int, array{libre?:int, commande?:int, woo?:int}>
+	 * @return array<int, array{stock?:int, supply?:int, woo?:int}>
 	 */
 	private static function read_inventory_input(): array {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par l'appelant.
@@ -494,27 +503,24 @@ final class StockPage {
 			$row = array();
 
 			/*
-			 * Signé, volontairement : absint() renvoie une valeur ABSOLUE, pas
-			 * un écrêtage à zéro. Une référence au stock hérité négatif
-			 * soumise sans y toucher doit rester lisible telle quelle pour
-			 * qu'Inventory::apply() puisse la comparer à Stock::get()/
-			 * Supply::get() (eux-mêmes potentiellement négatifs) et ne rien
-			 * écrire quand rien n'a changé — écrêter ici écrirait 0 à sa
-			 * place au moindre enregistrement du formulaire, même si le
-			 * marchand n'a pas touché cette ligne. Le plancher réel est
-			 * appliqué à l'écriture, par Stock::set()/Supply::set().
+			 * Plancher à zéro, contrairement à l'ancienne saisie du stock
+			 * LIBRE : ces champs portent désormais des TOTAUX, qui n'ont
+			 * aucun sens en négatif. Les clés `libre` / `commande` d'avant
+			 * cette bascule ne sont plus lues du tout — un onglet resté
+			 * ouvert avant la mise à jour les soumettrait encore, et les
+			 * interpréter comme des totaux déclencherait un retrait massif
+			 * sur tout le catalogue (le nonce reste valable ~12 h).
 			 */
-			if ( isset( $values['libre'] ) ) {
-				$row['libre'] = (int) $values['libre'];
+			if ( isset( $values['stock'] ) ) {
+				$row['stock'] = max( 0, (int) $values['stock'] );
 			}
 
-			if ( isset( $values['commande'] ) ) {
-				$row['commande'] = (int) $values['commande'];
+			if ( isset( $values['supply'] ) ) {
+				$row['supply'] = max( 0, (int) $values['supply'] );
 			}
 
-			// Signé pour la même raison : WooCommerce autorise en plus un
-			// stock négatif à part entière quand le retard de commande
-			// (backorder) est permis.
+			// Signé, lui : WooCommerce autorise un stock négatif à part
+			// entière quand le retard de commande (backorder) est permis.
 			if ( isset( $values['woo'] ) ) {
 				$row['woo'] = (int) $values['woo'];
 			}
@@ -523,6 +529,56 @@ final class StockPage {
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * Totaux affichés au rendu du formulaire, pour le verrou optimiste.
+	 *
+	 * Transportés dans UN champ compact (`id:stock:commande;…`) plutôt qu'en
+	 * deux champs cachés par ligne : à trois champs par référence, le
+	 * catalogue frôle déjà `max_input_vars` (1000 par défaut, troncature
+	 * SILENCIEUSE de PHP) ; en ajouter deux ramènerait le plafond à environ
+	 * 200 références.
+	 *
+	 * Ces valeurs ne servent JAMAIS de base au calcul d'un delta — celui-ci
+	 * est toujours recalculé côté serveur contre `Stock::get()`/`Supply::get()`.
+	 * Elles ne servent qu'à deux tests, dans `Inventory::apply()` : « ce champ
+	 * a-t-il été édité ? » et « l'état a-t-il changé depuis le rendu ? ». Une
+	 * valeur forgée dans ce champ ne peut donc que faire sauter une ligne
+	 * (conflit), jamais créer ou déplacer une unité.
+	 *
+	 * @return array<int, array{stock:int, supply:int}>
+	 */
+	private static function read_inventory_refs(): array {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par l'appelant.
+		$raw = isset( $_POST['rsmw_inventory_ref'] ) ? sanitize_text_field( wp_unslash( $_POST['rsmw_inventory_ref'] ) ) : '';
+
+		if ( '' === $raw ) {
+			return array();
+		}
+
+		$refs = array();
+
+		foreach ( explode( ';', $raw ) as $entry ) {
+			$parts = explode( ':', $entry );
+
+			if ( 3 !== count( $parts ) ) {
+				continue;
+			}
+
+			$product_id = absint( $parts[0] );
+
+			if ( $product_id <= 0 ) {
+				continue;
+			}
+
+			$refs[ $product_id ] = array(
+				'stock'  => max( 0, (int) $parts[1] ),
+				'supply' => max( 0, (int) $parts[2] ),
+			);
+		}
+
+		return $refs;
 	}
 
 	/**
