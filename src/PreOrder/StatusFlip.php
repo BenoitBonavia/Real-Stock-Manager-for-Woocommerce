@@ -39,8 +39,35 @@ defined( 'ABSPATH' ) || exit;
  * passer la commande en « À empaqueter » dès que toutes ses lignes sont pointées,
  * et mémorise « Précommande » comme statut de retour si une ligne redevient
  * incomplète.
+ *
+ * DIFFÉRÉ via Action Scheduler depuis la 0.9.0, et ce n'est pas cosmétique non
+ * plus. Poser le second statut ré-émet `woocommerce_order_status_changed` — donc
+ * rejoue TOUS ses écouteurs, Preparation\Allocator compris — une seconde fois
+ * dans la même requête que le paiement. Sur une commande précommandée, cette
+ * requête est déjà celle où la passerelle Stripe crée l'intention, débite la
+ * carte et attend une réponse JSON pour débloquer le client ; doubler son coût
+ * dedans est le seul facteur qui distingue une précommande d'une commande
+ * normale à cet instant précis, et le suspect le plus crédible d'une
+ * resoumission de paiement côté navigateur. On se contente donc ici de
+ * PLANIFIER la bascule (une simple ligne en base, via Action Scheduler), et on
+ * l'exécute dans `run()`, hors de la réponse HTTP du paiement.
  */
 final class StatusFlip {
+
+	/**
+	 * Hook Action Scheduler sur lequel la bascule différée s'exécute.
+	 *
+	 * @var string
+	 */
+	public const RUN_HOOK = 'rsmw_preorder_status_flip';
+
+	/**
+	 * Groupe Action Scheduler, pour repérer nos tâches dans Outils > Actions
+	 * planifiées sans avoir à les distinguer une par une.
+	 *
+	 * @var string
+	 */
+	public const GROUP = 'rsmw-preorder';
 
 	/**
 	 * Accroche la bascule.
@@ -57,80 +84,83 @@ final class StatusFlip {
 		 * Et il couvre TOUS les statuts suivis, pas seulement « En cours » : une
 		 * boutique qui encaisse par virement passe par « En attente ».
 		 *
-		 * PRIORITÉ 30, et ce n'est pas cosmétique. Preparation\Allocator est
-		 * accroché au MÊME hook en priorité 20 : il sert la commande dans le stock
-		 * libre puis, si elle devient complète, appelle StatusSync qui la passe en
-		 * « À empaqueter ». En 20 nous serions à égalité avec lui, donc départagés
-		 * par l'ordre d'enregistrement des modules — et nous écraserions un
-		 * « À empaqueter » tout juste posé. La bascule doit avoir le dernier mot,
-		 * et ne parler que si la commande attend encore.
+		 * PRIORITÉ 30 : Preparation\Allocator est accroché au MÊME hook en
+		 * priorité 20. Ici on ne fait que DÉCIDER s'il faut planifier une bascule
+		 * — l'exécuter est repoussé dans `run()` — donc l'ordre avec Allocator
+		 * n'a plus d'incidence sur cet appel-ci ; il en garde une sur `run()`,
+		 * documentée sur cette méthode.
 		 */
-		add_action( 'woocommerce_order_status_changed', array( __CLASS__, 'maybe_apply' ), 30, 4 );
+		add_action( 'woocommerce_order_status_changed', array( __CLASS__, 'maybe_schedule' ), 30, 4 );
+
+		add_action( self::RUN_HOOK, array( __CLASS__, 'run' ) );
 	}
 
 	/**
-	 * Applique le statut si la commande contient des articles précommandés.
+	 * Décide s'il faut planifier la bascule, sans jamais changer le statut ici.
 	 *
 	 * @param int             $order_id Identifiant de commande.
 	 * @param string          $from     Statut précédent.
 	 * @param string          $to       Nouveau statut.
 	 * @param \WC_Order|mixed $order    Commande.
 	 */
-	public static function maybe_apply( $order_id, $from, $to, $order ): void {
+	public static function maybe_schedule( $order_id, $from, $to, $order ): void {
 		/*
 		 * Les trois derniers arguments sont IGNORÉS, délibérément. `$to` est figé
 		 * au moment où la transition a été calculée, et `$order` est l'objet qui
-		 * l'a émise : entre-temps, Allocator et StatusSync ont pu faire passer la
-		 * commande en « À empaqueter » sur un AUTRE objet, rechargé. Décider sur
-		 * ces valeurs, c'est décider sur un état périmé — et enregistrer l'objet
-		 * périmé écraserait le travail des autres.
+		 * l'a émise : entre-temps, Allocator a pu faire passer la commande en
+		 * « À empaqueter » sur un AUTRE objet, rechargé. Décider sur ces valeurs,
+		 * c'est décider sur un état périmé.
 		 */
 		unset( $from, $to, $order );
 
-		if ( ! Config::auto_status_is_operative() ) {
-			return;
-		}
-
-		$order = wc_get_order( $order_id );
+		$order = self::eligible_order( $order_id );
 
 		if ( ! $order instanceof \WC_Order ) {
 			return;
 		}
 
-		$current = $order->get_status();
-		$applied = '' !== (string) $order->get_meta( Legacy::STATUS_APPLIED_META );
-
 		/*
-		 * La commande est déjà en « Précommande ». On pose quand même le témoin,
-		 * s'il manque : le statut a bien été appliqué, peu importe par qui. Sans
-		 * cela, une pose à la main ne compterait pas, et la bascule se rejouerait
-		 * plus tard — exactement le défaut du snippet remplacé, qui rendait
-		 * impossible de sortir une commande de ce statut.
+		 * `as_next_scheduled_action` évite un doublon si la commande retraverse
+		 * plusieurs statuts suivis avant que la tâche planifiée n'ait tourné (ex.
+		 * « En attente » → « En cours » rapprochés) : chaque passage ici
+		 * replanifierait sinon une tâche identique.
 		 */
-		if ( Legacy::STATUS_SLUG === $current ) {
-			if ( ! $applied && Marker::order_has_preorder( $order ) ) {
-				$order->update_meta_data( Legacy::STATUS_APPLIED_META, 1 );
-				$order->save();
-			}
-
+		if ( function_exists( 'as_next_scheduled_action' ) && as_next_scheduled_action( self::RUN_HOOK, array( $order_id ), self::GROUP ) ) {
 			return;
 		}
 
-		if ( $applied ) {
-			return;
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			as_schedule_single_action( time(), self::RUN_HOOK, array( $order_id ), self::GROUP );
+		} else {
+			// Repli si Action Scheduler n'est, pour une raison quelconque, pas
+			// chargé : on applique tout de suite plutôt que de perdre la bascule.
+			self::run( $order_id );
 		}
+	}
 
-		/*
-		 * Le statut RÉEL doit être suivi. Cette seule condition écarte deux cas :
-		 * « À empaqueter », qui signifie que la marchandise est là — y ramener une
-		 * précommande annulerait le travail de StatusSync — et les statuts
-		 * terminaux (Terminée, Annulée, Remboursée), qu'on ne rouvre jamais.
-		 */
-		if ( ! in_array( $current, PreparationConfig::statuses(), true ) ) {
-			return;
-		}
+	/**
+	 * Applique réellement le statut. Tourne hors de la requête de paiement.
+	 *
+	 * Tout est revérifié ici à neuf, via `eligible_order()` : l'état a pu
+	 * changer entre la planification et l'exécution (commande annulée
+	 * entre-temps, statut posé à la main par le marchand, module désactivé).
+	 * Reprendre l'état lu au moment de `maybe_schedule()` serait décider sur du
+	 * périmé.
+	 *
+	 * PRIORITÉ avec Allocator : ici, contrairement à `maybe_schedule()`, on
+	 * CHANGE le statut, donc on rejoue `woocommerce_order_status_changed` —
+	 * Allocator (priorité 20) tourne avant nous s'il réagit à CETTE
+	 * transition-ci. Comme il l'a déjà fait, sur ce même order_id, au moment du
+	 * paiement, ce second passage ne fait rien de plus que réévaluer un état
+	 * déjà à jour : sans effet notable, mais plus dans la réponse HTTP du
+	 * client.
+	 *
+	 * @param int $order_id Identifiant de commande.
+	 */
+	public static function run( $order_id ): void {
+		$order = self::eligible_order( $order_id );
 
-		if ( ! Marker::order_has_preorder( $order ) ) {
+		if ( ! $order instanceof \WC_Order ) {
 			return;
 		}
 
@@ -142,6 +172,73 @@ final class StatusFlip {
 		);
 
 		$order->save();
+	}
+
+	/**
+	 * Charge la commande et vérifie si elle doit encore basculer.
+	 *
+	 * Factorise les gardes communs à `maybe_schedule()` (qui ne fait que
+	 * PLANIFIER) et `run()` (qui bascule pour de vrai) : les deux doivent
+	 * écarter exactement les mêmes cas, sinon l'un planifierait ce que l'autre
+	 * refuserait d'appliquer.
+	 *
+	 * @param int $order_id Identifiant de commande.
+	 *
+	 * @return \WC_Order|null La commande si elle doit basculer, `null` sinon
+	 *                        — y compris quand le témoin a été posé au passage
+	 *                        sur une commande déjà en « Précommande ».
+	 */
+	private static function eligible_order( $order_id ): ?\WC_Order {
+		if ( ! Config::auto_status_is_operative() ) {
+			return null;
+		}
+
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order instanceof \WC_Order ) {
+			return null;
+		}
+
+		$current = $order->get_status();
+		$applied = '' !== (string) $order->get_meta( Legacy::STATUS_APPLIED_META );
+
+		/*
+		 * La commande est déjà en « Précommande ». On pose quand même le témoin,
+		 * s'il manque : le statut a bien été appliqué, peu importe par qui. Sans
+		 * cela, une pose à la main ne compterait pas, et la bascule se rejouerait
+		 * plus tard — exactement le défaut du snippet remplacé, qui rendait
+		 * impossible de sortir une commande de ce statut. Une simple pose de
+		 * méta ne rejoue pas les écouteurs de `woocommerce_order_status_changed`
+		 * (elle ne change pas le statut), donc rien à planifier pour ce cas.
+		 */
+		if ( Legacy::STATUS_SLUG === $current ) {
+			if ( ! $applied && Marker::order_has_preorder( $order ) ) {
+				$order->update_meta_data( Legacy::STATUS_APPLIED_META, 1 );
+				$order->save();
+			}
+
+			return null;
+		}
+
+		if ( $applied ) {
+			return null;
+		}
+
+		/*
+		 * Le statut RÉEL doit être suivi. Cette seule condition écarte deux cas :
+		 * « À empaqueter », qui signifie que la marchandise est là — y ramener une
+		 * précommande annulerait le travail de StatusSync — et les statuts
+		 * terminaux (Terminée, Annulée, Remboursée), qu'on ne rouvre jamais.
+		 */
+		if ( ! in_array( $current, PreparationConfig::statuses(), true ) ) {
+			return null;
+		}
+
+		if ( ! Marker::order_has_preorder( $order ) ) {
+			return null;
+		}
+
+		return $order;
 	}
 
 	/**

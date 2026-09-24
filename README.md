@@ -349,8 +349,19 @@ bloquée. `Config::auto_status_is_operative()` porte cette règle, et le diagnos
 `Preparation\Allocator` est sur le même hook en priorité 20 : il sert la commande dans le stock libre
 puis, si elle devient complète, appelle `StatusSync` qui la passe en « À empaqueter ». À égalité de
 priorité nous étions départagés par l'ordre d'enregistrement des modules, et nous écrasions un
-« À empaqueter » tout juste posé. Pour la même raison, `maybe_apply()` **ignore les arguments `$to` et
-`$order` du hook** — figés avant que les autres n'agissent — et relit la commande.
+« À empaqueter » tout juste posé. Pour la même raison, `maybe_schedule()` **ignore les arguments `$to`
+et `$order` du hook** — figés avant que les autres n'agissent — et relit la commande.
+
+**Différée via Action Scheduler depuis la 3.8.0.** `maybe_schedule()` ne fait plus que décider s'il
+faut basculer ; la bascule elle-même (`run()`, qui pose le statut et donc rejoue tous les écouteurs de
+`woocommerce_order_status_changed`, `Allocator` compris) s'exécute hors de la requête de paiement,
+quelques instants plus tard. En cause : sur une commande précommandée, cette requête est déjà celle où
+la passerelle de paiement (Stripe) débite la carte et attend la réponse JSON pour débloquer le client ;
+y rejouer tout `Allocator` une seconde fois — le seul traitement qui distingue une précommande d'une
+commande normale à cet instant précis — a été identifié comme le déclencheur le plus crédible d'un
+paiement Stripe pourtant réussi, qui se voyait resoumis puis marqué « Échoué » à tort par le plugin
+Stripe (qui n'écarte pas ce cas). `eligible_order()` revérifie tout à neuf au moment de l'exécution,
+plutôt que de reprendre l'état lu à la planification — devenu possiblement périmé entre-temps.
 
 ### La sémantique du statut vit hors du module
 

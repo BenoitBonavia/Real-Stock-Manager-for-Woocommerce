@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.7.0
+Stable tag: 3.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.8.0 =
+* Correctif : une commande contenant un article en précommande, payée avec succès via Stripe, pouvait être marquée à tort « Échouée » quelques instants après son passage en « Précommande » — l'argent bien encaissé, le stock remis à tort en rayon. En cause : notre bascule automatique vers « Précommande » rejouait, à l'intérieur même de la requête de paiement, tout le traitement d'allocation de stock une seconde fois — un ralentissement identifié comme le déclencheur le plus probable d'une resoumission du paiement, que le plugin Stripe échoue alors sans vérifier si la commande était déjà réglée. La bascule s'exécute désormais hors de cette requête, via une tâche planifiée quasi immédiate.
 
 = 3.7.0 =
 * Évolution : sur l'onglet « Inventaire », les colonnes « Stock libre » et « Commandé (non affecté) » sont remplacées par « Stock physique (total) » et « Commandé au fournisseur (total) » — le marchand saisit désormais ce qu'il compte réellement (rayon compris, articles déjà mis de côté pour des commandes inclus), et non plus un solde à calculer de tête. L'écart avec le total courant est attribué automatiquement aux commandes clients en attente, comme sur l'onglet « Mouvement à l'unité ».
