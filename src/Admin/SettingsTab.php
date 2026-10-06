@@ -21,10 +21,12 @@ use RSMW\Suppliers\Resolver as SupplierResolver;
 use RSMW\Suppliers\Taxonomy as SupplierTaxonomy;
 use RSMW\Preparation\Cost;
 use RSMW\Preparation\Defects;
+use RSMW\Preparation\Demand;
 use RSMW\Preparation\Items;
 use RSMW\Preparation\Journal;
 use RSMW\Preparation\OrderStatus;
 use RSMW\Preparation\SnippetGuard;
+use RSMW\Preparation\StalePacks;
 use RSMW\Preparation\Stock;
 use RSMW\Preparation\Supply;
 use RSMW\Support\Settings;
@@ -399,6 +401,34 @@ final class SettingsTab extends \WC_Settings_Page {
 			$this->yes_no( OrderStatus::is_declared() ),
 			'<strong>' . esc_html( number_format_i18n( OrderStatus::order_count() ) ) . '</strong>'
 		);
+
+		/*
+		 * Mesure directe de la violation de l'invariant « une commande
+		 * « À empaqueter » est intégralement pointée », dont dépend l'exclusion
+		 * de ce statut par Demand::active_order_ids(). Chaque unité comptée ici
+		 * est du stock sorti de la boutique sans jamais être décompté, sur une
+		 * commande qu'aucune attribution ne sait plus rattraper. Affichée
+		 * seulement si elle n'est pas nulle : sur une boutique saine, cette
+		 * ligne n'a rien à dire.
+		 */
+		$packs = Demand::incomplete_packs();
+
+		if ( $packs['orders'] > 0 ) {
+			$lines[] = '<strong style="color:#b32d2e">' . sprintf(
+				/* translators: 1: nombre de commandes, 2: nombre d'articles. */
+				esc_html__( 'Commandes « À empaqueter » au pointage incomplet : %1$s · articles jamais décomptés : %2$s. Elles ont été placées dans ce statut sans passer par le pointage ; la résorption automatique les reprend au fil des chargements de l’administration.', 'real-stock-manager-for-woocommerce' ),
+				esc_html( number_format_i18n( $packs['orders'] ) ),
+				esc_html( number_format_i18n( $packs['units'] ) )
+			) . '</strong>';
+
+			if ( $packs['truncated'] ) {
+				$lines[] = esc_html__( 'Décompte partiel : la mesure s’arrête à 2000 commandes.', 'real-stock-manager-for-woocommerce' );
+			}
+		}
+
+		if ( ! StalePacks::is_done() ) {
+			$lines[] = esc_html__( 'Résorption des commandes « À empaqueter » non pointées en cours : elle avance à chaque chargement de l’administration.', 'real-stock-manager-for-woocommerce' );
+		}
 
 		$lines[] = sprintf(
 			/* translators: 1: nombre de références, 2: nombre de lignes, 3: nombre d'entrées. */

@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.8.0
+Stable tag: 3.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,11 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.9.0 =
+* Correctif majeur : une commande placée en « À empaqueter » sans passer par le pointage — via l'action groupée « Marquer À empaqueter », le menu de statut de la fiche commande ou une automatisation — n'était plus jamais servie par quoi que ce soit. Ni l'attribution automatique, ni la réception d'un colis, ni l'onglet Inventaire, ni le bouton « Réaffecter » ne savaient la voir : son stock n'était jamais décompté, et rien ne le signalait — ni note de commande, ni journal. Pire, son besoin invisible désactivait aussi l'attribution automatique de l'onglet Inventaire pour la référence entière, pénalisant les autres commandes qui attendaient légitimement. Le plugin sert désormais une telle commande à son arrivée dans le statut, et la renvoie dans le circuit de préparation si le stock ne suffit pas, avec une note explicative.
+* Correctif : les commandes déjà bloquées dans cet état sont reprises automatiquement, par petits lots et une seule fois, avec un rapport détaillé sur « Besoins pour commande ». Le panneau Diagnostic affiche le nombre de commandes concernées et d'articles jamais décomptés.
+* Correctif : quand une commande « À empaqueter » redescendait faute de pointage complet et qu'aucun statut de retour n'avait été mémorisé, elle atterrissait sur « En cours » en dur. Sur une boutique dont les statuts suivis ne contiennent pas « En cours », elle sortait donc du périmètre de préparation — et son stock préparé était aussitôt restitué au stock libre, fabriquant du stock fantôme. Le repli est désormais le premier statut réellement suivi.
 
 = 3.8.0 =
 * Correctif : une commande contenant un article en précommande, payée avec succès via Stripe, pouvait être marquée à tort « Échouée » quelques instants après son passage en « Précommande » — l'argent bien encaissé, le stock remis à tort en rayon. En cause : notre bascule automatique vers « Précommande » rejouait, à l'intérieur même de la requête de paiement, tout le traitement d'allocation de stock une seconde fois — un ralentissement identifié comme le déclencheur le plus probable d'une resoumission du paiement, que le plugin Stripe échoue alors sans vérifier si la commande était déjà réglée. La bascule s'exécute désormais hors de cette requête, via une tâche planifiée quasi immédiate.

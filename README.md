@@ -147,6 +147,64 @@ compteur libre, ce que les lignes ont déjà absorbé ne devant pas l'être une 
 Une commande fournisseur **ne synchronise jamais le statut** : la marchandise n'est pas là, la
 commande ne peut donc pas devenir « À empaqueter ».
 
+### « À empaqueter » implique « intégralement pointée »
+
+C'est l'invariant le plus porteur du module, et il était tenu par personne.
+
+`Demand::active_order_ids()` définit le périmètre « commandes à servir » par le statut, en
+excluant volontairement `mh-empaqueter`. L'exclusion n'est pas gratuite : elle repose entièrement
+sur l'idée qu'une commande portant ce statut n'a plus rien à préparer, donc rien à recevoir.
+
+Trois chemins le démentaient : l'action groupée native **« Marquer À empaqueter »** — que le
+plugin ajoute lui-même, et que WooCommerce traite seul, en posant le statut **sans rien pointer** —
+le menu de statut de la fiche commande, et toute automatisation externe.
+
+Une commande ainsi placée tombait dans un cul-de-sac complet. Les trois fonctions qui distribuent
+le stock itèrent toutes sur `active_order_ids()` : `distribute_stock()` (cœur de `receive()` et de
+`credit_found_stock()`), `reallocate_all()` et `order_from_supplier()`. L'attribution automatique,
+elle, teste `Config::statuses()`, d'où `mh-empaqueter` est exclu par construction
+(`Config::normalize_statuses()`). Plus rien ne pouvait la servir, son stock n'était jamais
+décompté, et **aucune trace n'était laissée** — l'alerte `flag_completed_without_prep()` ne réagit
+qu'à « Terminée ».
+
+L'effet le plus coûteux était indirect : son besoin non couvert manquait aussi à la clé `restant`
+de `Demand::map()`, scopée au même périmètre. Or l'onglet Inventaire court-circuite l'attribution
+quand `restant` vaut zéro (`if ( $delta > 0 && 0 === $pending )`, écriture directe pour éviter un
+parcours inutile des commandes). Une seule commande gelée suffisait donc à **désactiver
+l'attribution de l'onglet Inventaire pour la référence entière**, pénalisant les autres commandes
+qui, elles, attendaient légitimement.
+
+`Allocator::reconcile_pack_status()` tient désormais l'invariant à la source, plutôt que
+d'apprendre à six mécanismes à vivre avec sa violation. À l'arrivée dans le statut : il sert la
+commande avec le stock disponible, et si elle reste incomplète la renvoie dans le circuit de
+préparation via `StatusSync::sync()`, avec note de commande et `Log::error()`.
+
+Deux points de conception :
+
+**Le chemin normal ne coûte rien.** `StatusSync::apply_status()` enregistre la commande pour poser
+le statut, ce qui rejoue tout le hook. À cet instant la commande est complète par définition —
+c'est ce qui a déclenché la promotion. Le gestionnaire sort donc sur `Items::order_is_ready()`,
+une comparaison de métas, sans la moindre lecture de stock.
+
+**La redescente n'est pas conditionnée par le réglage « Attribution automatique ».** Seule
+l'attribution l'est : un marchand qui l'a désactivée pointe à la main. Mais le statut resterait un
+mensonge et la commande gelée hors de tout périmètre — redescendre n'est pas négociable. Ce n'est
+d'ailleurs pas un comportement nouveau : `run_withdraw()` fait déjà exactement cela, et l'onglet
+Inventaire a déjà son canal de compte rendu pour ça (`rendues` → `dropped`).
+
+`StalePacks` résorbe l'arriéré déjà en base, qu'aucun événement ne viendrait rattraper : balayage
+unique par lots de dix sur `admin_init`, sur le patron de `FrozenHolds`, curseur sur l'identifiant
+de commande — jamais un `offset`, qu'une commande quittant le statut décalerait. Chaque commande
+passe par la même `Allocator::serve_or_demote_pack()` : une seule implémentation de la règle, deux
+déclencheurs. Contrairement à `FrozenHolds`, ce balayage **écrit du stock** : c'est l'écriture qui
+aurait dû avoir lieu à l'arrivée de la commande. Compte rendu en carte sur « Besoins pour
+commande », et `Demand::incomplete_packs()` alimente le panneau Diagnostic.
+
+**Reste une ergonomie en suspens** : l'action groupée « Marquer À empaqueter » n'est plus
+destructrice, mais elle demeure trompeuse — le marchand demande « marquer à empaqueter » et voit
+une partie des commandes revenir en « En cours ». La note de commande l'explique ; la retirer ou
+la renommer est un choix à part.
+
 ### Continuité des données
 
 Le module lit et écrit **exactement les mêmes clés** que le snippet — aucune migration.

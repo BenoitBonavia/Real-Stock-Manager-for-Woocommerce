@@ -15,6 +15,7 @@ use RSMW\Preparation\Labels;
 use RSMW\Preparation\Legacy;
 use RSMW\Preparation\OrderStatus;
 use RSMW\Preparation\Purchase;
+use RSMW\Preparation\StalePacks;
 use RSMW\Preparation\Stock;
 use RSMW\Preparation\Supply;
 use RSMW\Suppliers\Resolver;
@@ -132,6 +133,13 @@ final class NeedsPage {
 			FrozenHolds::acknowledge_report();
 			self::redirect( self::current_tab() );
 		}
+
+		if ( isset( $_POST['rsmw_stale_packs_ack'] ) ) {
+			check_admin_referer( 'rsmw_stale_packs_ack' );
+
+			StalePacks::acknowledge_report();
+			self::redirect( self::current_tab() );
+		}
 	}
 
 	/**
@@ -180,6 +188,7 @@ final class NeedsPage {
 				'negatives'        => Stock::negative_ids(),
 				'repaired'         => isset( $flash['repaired'] ) ? (int) $flash['repaired'] : null,
 				'frozen'           => self::frozen_report_for_display( FrozenHolds::report() ),
+				'stale_packs'      => self::stale_packs_for_display( StalePacks::report() ),
 				// Recalcul quasi gratuit : Demand::map( false ) vient de tourner
 				// ci-dessus et a déjà rafraîchi le transient que ceci relit.
 				'unbacked_pointed' => Demand::unbacked_pointed_total(),
@@ -254,6 +263,39 @@ final class NeedsPage {
 			$report['refs'][ $product_id ]['name']   = '' !== $info['variant'] ? $info['name'] . ' — ' . $info['variant'] : $info['name'];
 			$report['refs'][ $product_id ]['orders'] = $orders;
 		}
+
+		return $report;
+	}
+
+	/**
+	 * Résout numéros et liens des commandes du compte rendu de résorption,
+	 * pour que le gabarit n'ait qu'à afficher.
+	 *
+	 * Le balayage est plafonné à 200 commandes dans son propre compte rendu
+	 * (`StalePacks::MAX_ORDERS`) : la résolution est donc bornée elle aussi.
+	 *
+	 * @param array{served:int, demoted:int, units:int, order_ids:array<int, bool>, truncated:bool} $report Compte rendu brut de StalePacks::report().
+	 *
+	 * @return array{served:int, demoted:int, units:int, order_ids:array<int, bool>, truncated:bool, orders:array<int, array{num:string, url:string, status:string}>}
+	 */
+	private static function stale_packs_for_display( array $report ): array {
+		$orders = array();
+
+		foreach ( array_keys( (array) $report['order_ids'] ) as $order_id ) {
+			$order = wc_get_order( (int) $order_id );
+
+			if ( ! $order instanceof \WC_Order ) {
+				continue;
+			}
+
+			$orders[] = array(
+				'num'    => $order->get_order_number(),
+				'url'    => $order->get_edit_order_url(),
+				'status' => wc_get_order_status_name( $order->get_status() ),
+			);
+		}
+
+		$report['orders'] = $orders;
 
 		return $report;
 	}

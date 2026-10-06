@@ -420,6 +420,84 @@ final class Demand {
 	}
 
 	/**
+	 * Commandes « À empaqueter » dont le pointage est incomplet.
+	 *
+	 * Mesure directe de la violation de l'invariant qui autorise
+	 * `active_order_ids()` à exclure ce statut : une commande qui y figure est
+	 * censée être intégralement pointée. Chaque unité comptée ici est du stock
+	 * qui n'a jamais été décompté, sur une commande qu'aucune attribution ne
+	 * sait plus rattraper — voir `Allocator::reconcile_pack_status()`, qui
+	 * empêche désormais l'état de se créer, et `StalePacks`, qui résorbe
+	 * l'arriéré.
+	 *
+	 * Plafonnée comme `Allocator::release_removed_statuses()` : c'est un
+	 * panneau de diagnostic, pas un chemin chaud.
+	 *
+	 * @return array{orders:int, units:int, truncated:bool}
+	 */
+	public static function incomplete_packs(): array {
+		global $wpdb;
+
+		$empty = array(
+			'orders'    => 0,
+			'units'     => 0,
+			'truncated' => false,
+		);
+
+		$ids = wc_get_orders(
+			array(
+				'status' => array( Legacy::STATUS_SLUG ),
+				'type'   => 'shop_order',
+				'limit'  => 2000,
+				'return' => 'ids',
+			)
+		);
+
+		$ids = is_array( $ids ) ? array_map( 'intval', $ids ) : array();
+
+		if ( empty( $ids ) ) {
+			return $empty;
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+
+		/*
+		 * Jointure sur `_qty` plutôt que lecture de la quantité par la couche
+		 * CRUD : les deux tables d'items sont partagées à l'identique par HPOS
+		 * et le stockage historique, comme dans `map()` juste au-dessus. La
+		 * jointure externe sur le pointage est indispensable — une ligne jamais
+		 * pointée n'a pas de meta du tout, et c'est justement le cas à compter.
+		 */
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- placeholders générés, valeurs passées à prepare() ; diagnostic, à la demande.
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT COUNT( DISTINCT oi.order_id ) AS orders,
+				        SUM( CAST( q.meta_value AS SIGNED ) - CAST( COALESCE( p.meta_value, '0' ) AS SIGNED ) ) AS units
+				   FROM {$wpdb->prefix}woocommerce_order_items          AS oi
+				   INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta AS q
+				           ON q.order_item_id = oi.order_item_id AND q.meta_key = '_qty'
+				   LEFT JOIN {$wpdb->prefix}woocommerce_order_itemmeta  AS p
+				          ON p.order_item_id = oi.order_item_id AND p.meta_key = %s
+				  WHERE oi.order_item_type = 'line_item'
+				    AND oi.order_id IN ( {$placeholders} )
+				    AND CAST( COALESCE( p.meta_value, '0' ) AS SIGNED ) < CAST( q.meta_value AS SIGNED )",
+				array_merge( array( Legacy::ITEM_QTY_META ), $ids )
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		if ( ! $row ) {
+			return $empty;
+		}
+
+		return array(
+			'orders'    => (int) $row->orders,
+			'units'     => (int) $row->units,
+			'truncated' => count( $ids ) >= 2000,
+		);
+	}
+
+	/**
 	 * Constructeur privé : classe utilitaire, jamais instanciée.
 	 */
 	private function __construct() {}

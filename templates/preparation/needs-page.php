@@ -16,6 +16,7 @@ $rsmw_unknown     = (array) $data['unknown_statuses'];
 $rsmw_negatives   = (array) $data['negatives'];
 $rsmw_repaired    = $data['repaired'];
 $rsmw_frozen      = (array) $data['frozen'];
+$rsmw_stale       = (array) $data['stale_packs'];
 $rsmw_unbacked    = (int) $data['unbacked_pointed'];
 $rsmw_realloc     = $data['reallocation'];
 $rsmw_allocatable = (int) $data['allocatable'];
@@ -204,6 +205,59 @@ $rsmw_orphan = \RSMW\Preparation\Admin\NeedsPage::TAB_NONE === $rsmw_tab;
 					</form>
 				</div>
 			<?php endif; ?>
+		</div>
+	<?php endif; ?>
+
+	<?php if ( ! empty( $rsmw_stale['orders'] ) ) : ?>
+		<div class="rsmw-card rsmw-card--report">
+			<div class="rsmw-card__header">
+				<h2 class="rsmw-card__title">
+					<?php esc_html_e( 'Commandes « À empaqueter » jamais pointées', 'real-stock-manager-for-woocommerce' ); ?>
+				</h2>
+			</div>
+			<div class="rsmw-card__body">
+				<p>
+					<?php
+					printf(
+						esc_html(
+							/* translators: 1: nombre de commandes, 2: nombre d'unités, 3: nombre de commandes servies, 4: nombre de commandes redescendues. */
+							__( '%1$d commande(s) portaient le statut « À empaqueter » sans avoir été pointées — placées là par l’action groupée, par le menu de statut ou par une automatisation. Dans cet état, plus aucune attribution ne savait les rattraper et leur stock n’était jamais décompté. Elles viennent d’être reprises : %2$d article(s) pointé(s) et retiré(s) du stock libre, %3$d commande(s) servie(s) en entier, %4$d renvoyée(s) dans le circuit de préparation faute de stock suffisant.', 'real-stock-manager-for-woocommerce' )
+						),
+						(int) $rsmw_stale['served'] + (int) $rsmw_stale['demoted'],
+						(int) $rsmw_stale['units'],
+						(int) $rsmw_stale['served'],
+						(int) $rsmw_stale['demoted']
+					);
+					?>
+				</p>
+				<?php if ( ! empty( $rsmw_stale['truncated'] ) ) : ?>
+					<p><em><?php esc_html_e( 'Liste partielle : le volume dépasse ce que ce rapport peut détailler. Les totaux ci-dessus, eux, sont complets.', 'real-stock-manager-for-woocommerce' ); ?></em></p>
+				<?php endif; ?>
+				<p>
+					<?php
+					echo wp_kses_post(
+						implode(
+							', ',
+							array_map(
+								static function ( $rsmw_order ) {
+									return '<a href="' . esc_url( $rsmw_order['url'] ) . '">#' . esc_html( $rsmw_order['num'] ) . '</a>'
+										. ' <span class="rsmw-variant">(' . esc_html( $rsmw_order['status'] ) . ')</span>';
+								},
+								$rsmw_stale['orders']
+							)
+						)
+					);
+					?>
+				</p>
+			</div>
+			<div class="rsmw-card__footer">
+				<form method="post">
+					<?php wp_nonce_field( 'rsmw_stale_packs_ack' ); ?>
+					<button type="submit" name="rsmw_stale_packs_ack" value="1" class="button">
+						<?php esc_html_e( 'J’ai vu, masquer ce rapport', 'real-stock-manager-for-woocommerce' ); ?>
+					</button>
+				</form>
+			</div>
 		</div>
 	<?php endif; ?>
 

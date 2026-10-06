@@ -53,6 +53,13 @@ final class Allocator {
 		 */
 		add_action( 'woocommerce_order_status_changed', array( __CLASS__, 'release_if_out_of_scope' ), 20, 4 );
 		add_action( 'woocommerce_order_status_changed', array( __CLASS__, 'flag_completed_without_prep' ), 20, 4 );
+
+		/*
+		 * Tient l'invariant « une commande « À empaqueter » est intégralement
+		 * pointée », dont dépend l'exclusion de ce statut par
+		 * Demand::active_order_ids(). Voir reconcile_pack_status().
+		 */
+		add_action( 'woocommerce_order_status_changed', array( __CLASS__, 'reconcile_pack_status' ), 20, 4 );
 		add_action( 'woocommerce_trash_order', array( __CLASS__, 'release_on_trash' ) );
 		add_action( 'woocommerce_before_delete_order', array( __CLASS__, 'release_on_delete' ), 10, 2 );
 		add_action( 'woocommerce_before_delete_order_item', array( __CLASS__, 'release_on_delete_item' ) );
@@ -360,6 +367,158 @@ final class Allocator {
 		);
 
 		Log::error( sprintf( 'Commande %d terminée avec %d article(s) non pointé(s).', $order->get_id(), $missing ) );
+	}
+
+	/**
+	 * Réconcilie le statut « À empaqueter » avec l'état réel du pointage.
+	 *
+	 * Tout le module repose sur un invariant implicite : une commande portant
+	 * ce statut a, par construction, toutes ses lignes pointées. C'est ce qui
+	 * autorise `Demand::active_order_ids()` à l'exclure du périmètre « à
+	 * servir » — une commande qui n'a plus rien à préparer n'a pas à être
+	 * parcourue par l'attribution.
+	 *
+	 * L'invariant est faux dès qu'une commande y atterrit sans pointage :
+	 * l'action groupée native « Marquer À empaqueter » (voir
+	 * `OrderStatus::add_bulk_action()`, traitée par WooCommerce lui-même),
+	 * le menu de statut de la fiche commande, ou une automatisation externe.
+	 * Elle devient alors INVISIBLE des trois fonctions qui distribuent le
+	 * stock — `distribute_stock()`, `reallocate_all()`,
+	 * `order_from_supplier()`, toutes sur `active_order_ids()` — et son besoin
+	 * non couvert disparaît aussi de la clé `restant` de `Demand::map()`, ce
+	 * qui désactive au passage le raccourci d'écriture directe de l'onglet
+	 * Inventaire pour la référence entière. Rien ne la rattrape jamais, et son
+	 * stock n'est jamais décompté.
+	 *
+	 * D'où ce gestionnaire, qui tient l'invariant à la source plutôt que
+	 * d'apprendre à six mécanismes à vivre avec sa violation : il sert la
+	 * commande avec ce qui est disponible, et si elle reste incomplète la
+	 * renvoie dans un statut suivi, où le circuit habituel la reprend.
+	 *
+	 * @param int       $order_id Identifiant de commande.
+	 * @param string    $from     Statut précédent, non utilisé.
+	 * @param string    $to       Statut courant.
+	 * @param \WC_Order $order    Commande, si fournie par le hook.
+	 */
+	public static function reconcile_pack_status( $order_id, $from = '', $to = '', $order = null ): void {
+		unset( $from );
+
+		if ( Legacy::STATUS_SLUG !== (string) $to || self::$suppressed ) {
+			return;
+		}
+
+		$order = $order instanceof \WC_Order ? $order : wc_get_order( $order_id );
+
+		if ( ! $order instanceof \WC_Order ) {
+			return;
+		}
+
+		/*
+		 * Commande sans ligne : `Items::order_is_ready()` la déclare « pas
+		 * prête » (c'est voulu, une commande vide ne doit pas basculer), ce qui
+		 * la ferait redescendre ici. Or la fiche commande de l'administration
+		 * permet de poser un statut AVANT d'ajouter les lignes : on ne se met
+		 * pas en travers de ce geste, il n'y a de toute façon aucun stock en
+		 * jeu. `normalize_saved_items()` reprend la main à l'enregistrement.
+		 */
+		if ( empty( $order->get_items() ) ) {
+			return;
+		}
+
+		/*
+		 * Sortie du chemin normal, et c'est la raison de sa place ici.
+		 * StatusSync::apply_status() enregistre la commande pour poser ce
+		 * statut, ce qui rejoue tout ce hook : à cet instant la commande est
+		 * complète par définition, puisque c'est précisément ce qui a déclenché
+		 * la promotion. Le gestionnaire sort donc sur une comparaison de métas,
+		 * sans la moindre lecture de stock.
+		 */
+		if ( Items::order_is_ready( $order ) ) {
+			return;
+		}
+
+		// Garde de réentrance partagée avec maybe_auto_allocate() : la
+		// redescente de statut plus bas repasse par ce même hook.
+		$key = (int) $order->get_id();
+
+		if ( isset( self::$in_progress[ $key ] ) ) {
+			return;
+		}
+
+		self::$in_progress[ $key ] = true;
+
+		try {
+			self::serve_or_demote_pack( $order );
+		} finally {
+			unset( self::$in_progress[ $key ] );
+		}
+	}
+
+	/**
+	 * Sert une commande « À empaqueter » incomplète, et la fait redescendre si
+	 * elle le reste.
+	 *
+	 * Extrait de `reconcile_pack_status()` pour être partagé avec le balayage
+	 * de l'arriéré (`StalePacks`) : une seule implémentation de la règle, deux
+	 * déclencheurs. Ne teste PAS `self::$suppressed` — c'est au point d'entrée
+	 * du hook de le faire, le balayage voulant au contraire agir.
+	 *
+	 * @param \WC_Order $order Commande, dont le statut est « À empaqueter » et
+	 *                         le pointage incomplet (vérifié par l'appelant).
+	 *
+	 * @return string Statut après réconciliation.
+	 */
+	public static function serve_or_demote_pack( \WC_Order $order ): string {
+		$key = (int) $order->get_id();
+
+		/*
+		 * L'attribution est la seule part conditionnée par le réglage : un
+		 * marchand qui l'a désactivée pointe à la main, on ne le fait pas pour
+		 * lui. La redescente, elle, n'est pas négociable — le statut serait un
+		 * mensonge et la commande resterait gelée hors de tout périmètre.
+		 */
+		if ( Config::auto_allocate() ) {
+			self::allocate_order( $order );
+			self::allocate_ordered_to_order( $order );
+		}
+
+		$fresh = wc_get_order( $key );
+
+		if ( ! $fresh instanceof \WC_Order ) {
+			return Legacy::STATUS_SLUG;
+		}
+
+		// Servie en entier : elle reste légitimement « À empaqueter ».
+		if ( Items::order_is_ready( $fresh ) ) {
+			return Legacy::STATUS_SLUG;
+		}
+
+		$coverage = Items::order_coverage( $fresh );
+		$prepared = (int) $coverage[0];
+		$total    = (int) $coverage[2];
+
+		$fresh->add_order_note(
+			sprintf(
+				/* translators: 1: quantité pointée, 2: quantité totale. */
+				__( 'Placée en « À empaqueter » sans que le stock suffise à la préparer (%1$d/%2$d). Laissée dans ce statut, elle n’aurait plus jamais été servie par l’attribution automatique : elle est donc renvoyée dans le circuit de préparation, où la prochaine entrée de stock la reprendra.', 'real-stock-manager-for-woocommerce' ),
+				$prepared,
+				$total
+			)
+		);
+
+		Log::error( sprintf( 'Commande %d : arrivée en « À empaqueter » au pointage incomplet (%d/%d), renvoyée au circuit de préparation.', $key, $prepared, $total ) );
+
+		/*
+		 * Transition interne, déjà réconciliée : les écouteurs du hook n'ont
+		 * rien à y refaire. Sans cette neutralisation, maybe_auto_allocate()
+		 * rejouerait l'attribution qu'on vient de faire. Même raisonnement que
+		 * dans run_withdraw(), qui appelle aussi sync() sous ce drapeau.
+		 */
+		return (string) self::without_auto_allocation(
+			static function () use ( $fresh ) {
+				return StatusSync::sync( $fresh );
+			}
+		);
 	}
 
 	/**

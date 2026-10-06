@@ -18,6 +18,7 @@ use RSMW\Preparation\Config;
 use RSMW\Preparation\Demand;
 use RSMW\Preparation\FrozenHolds;
 use RSMW\Preparation\SnippetGuard;
+use RSMW\Preparation\StalePacks;
 use RSMW\Preparation\StatusSync;
 use RSMW\Suppliers\Admin\ProductField as SupplierProductField;
 use RSMW\Support\Settings;
@@ -85,6 +86,11 @@ final class OrderPreparation extends AbstractModule {
 			// Purge, une fois, des pointages gelés hérités d'avant la libération
 			// automatique du chantier 6 (v3.5.0) — voir FrozenHolds.
 			FrozenHolds::register();
+
+			// Résorption, une fois, des commandes « À empaqueter » jamais
+			// pointées qu'aucune attribution ne savait plus rattraper — voir
+			// StalePacks et Allocator::reconcile_pack_status().
+			StalePacks::register();
 
 			/*
 			 * Le champ « Fournisseur » est câblé ici, et non depuis un module à

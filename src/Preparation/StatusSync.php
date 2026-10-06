@@ -100,7 +100,17 @@ final class StatusSync {
 			$fallback = '' === $previous || ! isset( $known[ 'wc-' . $previous ] );
 
 			if ( $fallback ) {
-				$previous = Config::DEFAULT_STATUSES[0];
+				/*
+				 * Le premier statut SUIVI, jamais Config::DEFAULT_STATUSES[0] —
+				 * qui vaut « processing » en dur. Sur une boutique dont les
+				 * statuts suivis ne contiennent pas « processing », ce repli
+				 * faisait atterrir la commande HORS périmètre, et
+				 * Allocator::release_if_out_of_scope(), accroché au même hook,
+				 * restituait alors au stock libre tout ce que la redescente
+				 * venait précisément de préserver. Config::statuses() est
+				 * garanti non vide, l'index [0] est donc toujours défini.
+				 */
+				$previous = $actives[0];
 			}
 
 			// Suppression mise en file, persistée par le save() d'apply_status().
