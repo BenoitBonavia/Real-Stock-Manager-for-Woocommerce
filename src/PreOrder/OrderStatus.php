@@ -36,15 +36,19 @@ final class OrderStatus {
 		/*
 		 * Sémantique du statut, enregistrée ICI et non dans le module.
 		 *
-		 * Ces trois filtres décrivent ce que « Précommande » SIGNIFIE pour
-		 * WooCommerce, pas la façon dont il est posé. Les laisser dans le module
-		 * ferait qu'en le désactivant, les commandes qui portent le statut
-		 * sortiraient des rapports et perdraient leurs téléchargements — alors
-		 * qu'elles n'ont pas bougé.
+		 * Ces filtres décrivent ce que « Précommande » SIGNIFIE pour WooCommerce,
+		 * pas la façon dont il est posé. Les laisser dans le module ferait
+		 * qu'en le désactivant, les commandes qui portent le statut sortiraient
+		 * des rapports et perdraient leurs téléchargements — alors qu'elles
+		 * n'ont pas bougé.
+		 *
+		 * `woocommerce_valid_order_statuses_for_payment` est volontairement
+		 * ABSENT : une précommande est déjà réglée, et l'y ajouter fait que
+		 * `needs_payment()` renvoie true, donc un bouton « Payer » sur le suivi
+		 * de commande du client.
 		 */
 		add_filter( 'woocommerce_order_is_paid_statuses', array( __CLASS__, 'add_status' ) );
 		add_filter( 'woocommerce_valid_order_statuses_for_payment_complete', array( __CLASS__, 'add_status' ) );
-		add_filter( 'woocommerce_valid_order_statuses_for_payment', array( __CLASS__, 'add_status' ) );
 		add_filter( 'woocommerce_order_is_download_permitted', array( __CLASS__, 'allow_downloads' ), 10, 2 );
 	}
 

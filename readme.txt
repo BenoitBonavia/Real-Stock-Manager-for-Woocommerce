@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.9.0
+Stable tag: 3.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.9.1 =
+* Correctif : les commandes au statut « Précommande » affichaient un bouton « Payer » dans le suivi de commande du client, alors qu'elles sont déjà réglées. Le statut était déclaré comme « payable » auprès de WooCommerce ; il ne l'est plus. Il reste compté comme payé dans les rapports, conserve les téléchargements et accepte toujours la finalisation du paiement.
 
 = 3.9.0 =
 * Correctif majeur : une commande placée en « À empaqueter » sans passer par le pointage — via l'action groupée « Marquer À empaqueter », le menu de statut de la fiche commande ou une automatisation — n'était plus jamais servie par quoi que ce soit. Ni l'attribution automatique, ni la réception d'un colis, ni l'onglet Inventaire, ni le bouton « Réaffecter » ne savaient la voir : son stock n'était jamais décompté, et rien ne le signalait — ni note de commande, ni journal. Pire, son besoin invisible désactivait aussi l'attribution automatique de l'onglet Inventaire pour la référence entière, pénalisant les autres commandes qui attendaient légitimement. Le plugin sert désormais une telle commande à son arrivée dans le statut, et la renvoie dans le circuit de préparation si le stock ne suffit pas, avec une note explicative.
