@@ -8,6 +8,7 @@
 namespace RSMW\PreOrder\Admin;
 
 use RSMW\PreOrder\Legacy;
+use RSMW\Preparation\Legacy as PreparationLegacy;
 use RSMW\Preparation\Config;
 use RSMW\Preparation\OrderStatus as PreparationStatus;
 
@@ -122,7 +123,7 @@ final class OrdersView {
 		}
 
 		if ( self::VIEW_TODO === $view ) {
-			$args['status'] = Config::statuses();
+			$args['status'] = self::todo_statuses();
 		} elseif ( self::VIEW_PREORDERS === $view ) {
 			if ( ! isset( $args['meta_query'] ) || ! is_array( $args['meta_query'] ) ) {
 				$args['meta_query'] = array();
@@ -186,7 +187,7 @@ final class OrdersView {
 					static function ( $status ) {
 						return 'wc-' . $status;
 					},
-					Config::statuses()
+					self::todo_statuses()
 				)
 			);
 
@@ -209,6 +210,20 @@ final class OrdersView {
 	}
 
 	/**
+	 * Statuts regroupés par la vue « À traiter ».
+	 *
+	 * Les statuts à préparer, plus « À empaqueter » : une commande déjà basculée
+	 * reste à traiter (il lui reste à être emballée et expédiée). Il est exclu de
+	 * Config::statuses() à dessein — l'attribution automatique ne doit pas le
+	 * servir —, d'où l'ajout ici plutôt que dans la configuration.
+	 *
+	 * @return string[]
+	 */
+	private static function todo_statuses(): array {
+		return array_values( array_unique( array_merge( Config::statuses(), array( PreparationLegacy::STATUS_SLUG ) ) ) );
+	}
+
+	/**
 	 * Nombre de commandes dans les statuts à préparer.
 	 *
 	 * @return int
@@ -220,7 +235,7 @@ final class OrdersView {
 
 		$total = 0;
 
-		foreach ( Config::statuses() as $status ) {
+		foreach ( self::todo_statuses() as $status ) {
 			$total += (int) wc_orders_count( $status );
 		}
 
