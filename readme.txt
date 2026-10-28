@@ -4,7 +4,7 @@ Tags: woocommerce, stock, inventaire, gestion de stock
 Requires at least: 6.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.9.2
+Stable tag: 3.9.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,10 @@ Depuis l'écran Extensions, le lien « Check for updates » sous la ligne du plu
 La vérification automatique a lieu au plus toutes les 12 heures.
 
 == Changelog ==
+
+= 3.9.3 =
+* Évolution : la vue « Précommandes » de la liste des commandes ne montre plus que les précommandes pas encore expédiées — les commandes terminées, annulées, remboursées ou échouées en sortent, même si leur marqueur de précommande subsiste. Le compteur suit la même règle.
+* Évolution : le lien natif du statut « Précommande », qui faisait doublon avec « Précommandes », n'est plus affiché au-dessus de la liste. Le statut lui-même est inchangé.
 
 = 3.9.2 =
 * Correctif : la vue « À traiter » de la liste des commandes n'affichait pas les commandes au statut « À empaqueter » (ni dans la liste, ni dans le compteur), puisqu'elle ne reprenait que les « Statuts à préparer ». Elle les inclut désormais. Le réglage « Statuts à préparer » est inchangé : l'attribution automatique, la table des besoins et la bascule ne servent toujours pas ces commandes.

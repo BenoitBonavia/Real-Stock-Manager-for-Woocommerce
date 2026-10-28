@@ -21,9 +21,10 @@ defined( 'ABSPATH' ) || exit;
  * préparer — il suit donc automatiquement sa configuration, là où le snippet
  * remplacé codait la liste en dur.
  *
- * « Précommandes » filtre sur le MARQUEUR, pas sur le statut. C'est toute la
- * différence : la vue reste juste une fois la commande expédiée, alors qu'un
- * filtre par statut la perdait de vue dès qu'elle avançait.
+ * « Précommandes » filtre sur le MARQUEUR, pas sur le statut : la vue suit la
+ * commande quand elle avance (En cours, À empaqueter…), là où un filtre par
+ * statut la perdait de vue. Elle ne garde que les commandes pas encore
+ * expédiées : terminées, annulées, remboursées et échouées en sortent.
  */
 final class OrdersView {
 
@@ -91,6 +92,9 @@ final class OrdersView {
 		$current = self::current_view();
 		$base    = self::base_url();
 
+		// Le lien natif du statut « Précommande » ferait doublon avec « Précommandes ».
+		unset( $views[ Legacy::STATUS_FULL ] );
+
 		$views[ 'rsmw_' . self::VIEW_TODO ] = self::link(
 			add_query_arg( self::PARAM, self::VIEW_TODO, $base ),
 			__( 'À traiter', 'real-stock-manager-for-woocommerce' ),
@@ -125,6 +129,8 @@ final class OrdersView {
 		if ( self::VIEW_TODO === $view ) {
 			$args['status'] = self::todo_statuses();
 		} elseif ( self::VIEW_PREORDERS === $view ) {
+			$args['status'] = self::preorder_statuses();
+
 			if ( ! isset( $args['meta_query'] ) || ! is_array( $args['meta_query'] ) ) {
 				$args['meta_query'] = array();
 			}
@@ -195,6 +201,16 @@ final class OrdersView {
 		}
 
 		if ( self::VIEW_PREORDERS === $view ) {
+			$query->set(
+				'post_status',
+				array_map(
+					static function ( $status ) {
+						return 'wc-' . $status;
+					},
+					self::preorder_statuses()
+				)
+			);
+
 			// Fusion plutôt qu'écrasement : la liste des commandes pose déjà une
 			// meta_query quand le marchand filtre par client.
 			$meta_query = $query->get( 'meta_query' );
@@ -221,6 +237,28 @@ final class OrdersView {
 	 */
 	private static function todo_statuses(): array {
 		return array_values( array_unique( array_merge( Config::statuses(), array( PreparationLegacy::STATUS_SLUG ) ) ) );
+	}
+
+	/**
+	 * Statuts d'une précommande « en cours » : tous, sauf ceux où elle n'a plus
+	 * rien à attendre.
+	 *
+	 * « Terminée » est le statut de la marchandise expédiée ; annulée, remboursée
+	 * et échouée sont des fins de vie sans expédition. Dans tous les cas la
+	 * commande quitte la vue, bien que son marqueur subsiste.
+	 *
+	 * @return string[] Slugs nus.
+	 */
+	private static function preorder_statuses(): array {
+		$closed = array( 'completed', 'cancelled', 'refunded', 'failed' );
+		$all    = array_map(
+			static function ( $status ) {
+				return preg_replace( '/^wc-/', '', (string) $status );
+			},
+			array_keys( wc_get_order_statuses() )
+		);
+
+		return array_values( array_diff( $all, $closed ) );
 	}
 
 	/**
@@ -263,7 +301,7 @@ final class OrdersView {
 				'return'     => 'ids',
 				'paginate'   => true,
 				'type'       => 'shop_order',
-				'status'     => 'any',
+				'status'     => self::preorder_statuses(),
 				'meta_query' => array(
 					array(
 						'key'     => Legacy::ORDER_FLAG_META,
